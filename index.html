@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Mi Criadero</title>
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C0392B">
+
+<!-- iOS PWA -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mi Criadero">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f2f2f7; color: #1c1c1e; font-size: 17px; -webkit-font-smoothing: antialiased; }
+body { padding-bottom: 90px; min-height: 100vh; }
+
+/* Header */
+.header { background: #fff; padding: 16px 20px 12px; border-bottom: 1px solid #e5e5ea; position: sticky; top: 0; z-index: 100; }
+.header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.header h1 { font-size: 28px; font-weight: 700; }
+.btn-add { width: 44px; height: 44px; background: #007aff; color: white; border: none; border-radius: 22px; font-size: 28px; font-weight: 300; line-height: 44px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,122,255,0.3); }
+.btn-add:active { background: #0056cc; }
+.search-box { width: 100%; padding: 12px 16px; background: #e5e5ea; border: none; border-radius: 10px; font-size: 17px; }
+
+/* Bottom Nav */
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e5ea; display: flex; padding: 8px 0 20px; z-index: 100; }
+.nav-btn { flex: 1; background: none; border: none; padding: 8px 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; color: #8e8e93; font-size: 11px; font-weight: 500; }
+.nav-btn.active { color: #007aff; }
+.nav-btn .icon { font-size: 24px; }
+
+/* Lista de aves */
+.bird-list { background: #fff; margin-top: 8px; }
+.bird-item { display: flex; align-items: center; padding: 12px 20px; border-bottom: 1px solid #e5e5ea; cursor: pointer; gap: 14px; }
+.bird-item:active { background: #f2f2f7; }
+.bird-photo { width: 56px; height: 56px; border-radius: 50%; background: #e5e5ea; display: flex; align-items: center; justify-content: center; font-size: 28px; overflow: hidden; flex-shrink: 0; }
+.bird-photo img { width: 100%; height: 100%; object-fit: cover; }
+.bird-info { flex: 1; min-width: 0; }
+.bird-name { font-size: 18px; font-weight: 600; margin-bottom: 2px; }
+.bird-meta { font-size: 14px; color: #8e8e93; }
+.bird-chevron { color: #c7c7cc; font-size: 20px; }
+.empty-state { text-align: center; padding: 60px 30px; color: #8e8e93; }
+.empty-state .big-icon { font-size: 64px; margin-bottom: 16px; }
+.empty-state h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #1c1c1e; }
+
+/* Modal / Form */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: none; align-items: flex-end; }
+.modal-overlay.active { display: flex; }
+.modal { background: #f2f2f7; width: 100%; max-height: 95vh; border-radius: 16px 16px 0 0; overflow-y: auto; animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-header { background: #fff; padding: 14px 16px; border-bottom: 1px solid #e5e5ea; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+.modal-title { font-size: 17px; font-weight: 600; }
+.modal-btn { background: none; border: none; color: #007aff; font-size: 17px; font-weight: 500; cursor: pointer; padding: 4px 8px; }
+.modal-btn.primary { font-weight: 600; }
+.modal-body { padding: 16px; }
+
+/* Form sections */
+.form-section { background: #fff; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+.form-section-title { font-size: 13px; font-weight: 600; color: #8e8e93; text-transform: uppercase; padding: 16px 16px 8px; letter-spacing: 0.5px; }
+.form-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #e5e5ea; gap: 12px; min-height: 50px; }
+.form-row:last-child { border-bottom: none; }
+.form-label { font-size: 15px; color: #1c1c1e; flex-shrink: 0; min-width: 110px; font-weight: 500; }
+.form-input, .form-select { flex: 1; border: none; outline: none; font-size: 16px; background: transparent; text-align: right; color: #007aff; min-width: 0; }
+.form-input::placeholder { color: #c7c7cc; }
+.form-input.full { text-align: left; color: #1c1c1e; }
+textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
+
+/* Photo upload */
+.photo-upload { padding: 20px; text-align: center; background: #fff; border-radius: 10px; margin-bottom: 16px; }
+.photo-preview { width: 120px; height: 120px; border-radius: 60px; background: #e5e5ea; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-size: 48px; overflow: hidden; cursor: pointer; border: 3px dashed #c7c7cc; }
+.photo-preview.has-photo { border: none; }
+.photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-btn { color: #007aff; background: none; border: none; font-size: 16px; cursor: pointer; padding: 6px 12px; }
+
+/* Botones grandes */
+.btn-big { width: 100%; padding: 14px; background: #007aff; color: white; border: none; border-radius: 10px; font-size: 17px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+.btn-big:active { background: #0056cc; }
+.btn-big.danger { background: #ff3b30; }
+.btn-big.secondary { background: #fff; color: #007aff; border: 1px solid #e5e5ea; }
+.btn-big.success { background: #34c759; }
+
+/* Detail view */
+.detail-photo { width: 100%; height: 280px; background: #e5e5ea; display: flex; align-items: center; justify-content: center; font-size: 100px; overflow: hidden; }
+.detail-photo img { width: 100%; height: 100%; object-fit: cover; }
+.detail-section { background: #fff; padding: 16px; margin-bottom: 12px; }
+.detail-section h3 { font-size: 13px; font-weight: 600; color: #8e8e93; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 0.5px; }
+.detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f2f2f7; gap: 12px; }
+.detail-row:last-child { border-bottom: none; }
+.detail-row .label { color: #8e8e93; font-size: 15px; flex-shrink: 0; }
+.detail-row .value { color: #1c1c1e; font-size: 15px; font-weight: 500; text-align: right; }
+
+/* Badges */
+.badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge.healthy { background: #d4f4dd; color: #34c759; }
+.badge.alert { background: #ffe0de; color: #ff3b30; }
+.badge.warning { background: #fff4d4; color: #ff9500; }
+.badge.dead { background: #e5e5ea; color: #8e8e93; }
+.badge.sold { background: #d4e4ff; color: #007aff; }
+
+/* Lista de peleas */
+.fight-item { padding: 10px 0; border-bottom: 1px solid #f2f2f7; }
+.fight-item:last-child { border-bottom: none; }
+.fight-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.result-W { color: #34c759; font-weight: 700; }
+.result-T { color: #ff9500; font-weight: 700; }
+.result-L { color: #ff3b30; font-weight: 700; }
+
+/* Árbol genealógico */
+.tree-container { padding: 20px; background: #fff; overflow-x: auto; }
+.tree-level { display: flex; justify-content: center; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+.tree-node { padding: 10px 14px; background: #f2f2f7; border-radius: 10px; min-width: 110px; text-align: center; cursor: pointer; border: 2px solid transparent; }
+.tree-node.center { background: #007aff; color: white; border-color: #0056cc; }
+.tree-node.male { border-color: #007aff; }
+.tree-node.female { border-color: #ff2d92; }
+.tree-node .placa { font-weight: 700; font-size: 14px; }
+.tree-node .nombre { font-size: 12px; opacity: 0.85; }
+.tree-label { text-align: center; color: #8e8e93; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px; }
+
+/* Zonas */
+.zone-card { background: #fff; padding: 16px; margin-bottom: 10px; border-radius: 10px; cursor: pointer; }
+.zone-name { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.zone-count { color: #8e8e93; font-size: 14px; }
+
+/* Inventario */
+.inv-category { background: #fff; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+.inv-category-header { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; background: #f9f9fa; border-bottom: 1px solid #e5e5ea; }
+.inv-category-title { font-size: 16px; font-weight: 600; }
+.inv-total { color: #007aff; font-weight: 600; }
+.inv-item { padding: 10px 16px; display: flex; justify-content: space-between; border-bottom: 1px solid #f2f2f7; }
+.inv-item:last-child { border-bottom: none; }
+.inv-item-info .name { font-size: 15px; font-weight: 500; }
+.inv-item-info .meta { font-size: 13px; color: #8e8e93; margin-top: 2px; }
+.inv-item-cost { font-size: 15px; font-weight: 600; color: #1c1c1e; }
+
+/* Pendientes */
+.pending-item { background: #fff; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 12px; }
+.pending-icon { font-size: 28px; flex-shrink: 0; }
+.pending-content { flex: 1; }
+.pending-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.pending-desc { font-size: 14px; color: #8e8e93; margin-bottom: 6px; }
+.pending-date { font-size: 12px; color: #c7c7cc; }
+.pending-actions { display: flex; gap: 8px; margin-top: 8px; }
+.btn-small { padding: 6px 12px; border-radius: 6px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-small.done { background: #34c759; color: white; }
+.btn-small.delete { background: #ff3b30; color: white; }
+
+/* Tabs internas */
+.tabs { display: flex; background: #e5e5ea; border-radius: 8px; padding: 2px; margin-bottom: 16px; }
+.tab { flex: 1; padding: 8px; text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; border-radius: 6px; color: #8e8e93; }
+.tab.active { background: #fff; color: #1c1c1e; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+/* Toast */
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1c1c1e; color: white; padding: 12px 20px; border-radius: 10px; z-index: 1000; font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 90%; text-align: center; }
+.toast.show { opacity: 1; }
+
+/* Filter buttons */
+.filter-bar { background: #fff; padding: 10px 16px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid #e5e5ea; }
+.filter-chip { padding: 6px 14px; background: #f2f2f7; border-radius: 16px; font-size: 13px; cursor: pointer; white-space: nowrap; border: 1px solid transparent; }
+.filter-chip.active { background: #007aff; color: white; }
+
+/* Otras pantallas que no son lista */
+.page { display: none; }
+.page.active { display: block; }
+.page-header { padding: 16px 20px 12px; background: #fff; border-bottom: 1px solid #e5e5ea; position: sticky; top: 0; z-index: 50; }
+.page-header h2 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+.page-header p { font-size: 14px; color: #8e8e93; }
+.page-content { padding: 16px; }
+
+/* Helper text */
+.help-text { font-size: 13px; color: #8e8e93; padding: 8px 16px; }
+.required { color: #ff3b30; }
+
+/* Confirmation dialog */
+.confirm-dialog { background: #fff; border-radius: 14px; padding: 20px; max-width: 320px; margin: auto; text-align: center; }
+.confirm-dialog h3 { font-size: 17px; margin-bottom: 8px; }
+.confirm-dialog p { font-size: 14px; color: #8e8e93; margin-bottom: 16px; }
+.confirm-buttons { display: flex; gap: 10px; }
+.confirm-buttons button { flex: 1; }
+.modal-overlay.center { align-items: center; padding: 20px; }
+
+@media (min-width: 600px) {
+  body { max-width: 500px; margin: 0 auto; box-shadow: 0 0 20px rgba(0,0,0,0.1); min-height: 100vh; background: #f2f2f7; }
+  .bottom-nav { max-width: 500px; left: 50%; transform: translateX(-50%); }
+}
+</style>
+</head>
+<body>
+
+<!-- PÁGINA: AVES -->
+<div class="page active" id="page-birds">
+  <div class="header">
+    <div class="header-row">
+      <h1>🐓 Mis Aves</h1>
+      <button class="btn-add" onclick="openBirdForm()">+</button>
+    </div>
+    <input type="text" class="search-box" placeholder="Buscar por placa o nombre..." id="search-input" oninput="renderBirds()">
+  </div>
+  <div class="filter-bar">
+    <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todas</div>
+    <div class="filter-chip" data-filter="Gallo" onclick="setFilter('Gallo')">Gallos</div>
+    <div class="filter-chip" data-filter="Gallina" onclick="setFilter('Gallina')">Gallinas</div>
+    <div class="filter-chip" data-filter="vivo" onclick="setFilter('vivo')">Vivos</div>
+    <div class="filter-chip" data-filter="muerto" onclick="setFilter('muerto')">Muertos</div>
+    <div class="filter-chip" data-filter="vendido" onclick="setFilter('vendido')">Vendidos</div>
+  </div>
+  <div class="bird-list" id="bird-list"></div>
+</div>
+
+<!-- PÁGINA: ÁRBOL -->
+<div class="page" id="page-tree">
+  <div class="page-header">
+    <h2>🌳 Árbol Genealógico</h2>
+    <p>Selecciona un ave para ver su árbol</p>
+  </div>
+  <div class="page-content">
+    <div class="form-section">
+      <div class="form-row">
+        <label class="form-label">Ave</label>
+        <select class="form-select" id="tree-select" onchange="renderTree()">
+          <option value="">-- Elige un ave --</option>
+        </select>
+      </div>
+    </div>
+    <div id="tree-display"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: ZONAS -->
+<div class="page" id="page-zones">
+  <div class="page-header">
+    <h2>📍 Zonas del Criadero</h2>
+    <p>Organiza dónde está cada ave</p>
+  </div>
+  <div class="page-content">
+    <button class="btn-big" onclick="addZone()">+ Agregar Zona</button>
+    <div id="zone-list"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: INVENTARIO -->
+<div class="page" id="page-inventory">
+  <div class="page-header">
+    <h2>💰 Inventario y Costos</h2>
+    <p>Lleva tus gastos al día</p>
+  </div>
+  <div class="page-content">
+    <div class="form-section" style="padding: 16px; text-align: center;">
+      <div style="font-size: 13px; color: #8e8e93; margin-bottom: 4px;">GASTO TOTAL</div>
+      <div style="font-size: 32px; font-weight: 700; color: #007aff;" id="total-inv">$0</div>
+    </div>
+    <button class="btn-big" onclick="openInvForm()">+ Agregar Gasto</button>
+    <div id="inv-list"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: PENDIENTES -->
+<div class="page" id="page-pending">
+  <div class="page-header">
+    <h2>⚠️ Pendientes</h2>
+    <p>Salud y recordatorios</p>
+  </div>
+  <div class="page-content">
+    <div id="pending-list"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: MÁS -->
+<div class="page" id="page-more">
+  <div class="page-header">
+    <h2>⚙️ Más Opciones</h2>
+  </div>
+  <div class="page-content">
+    <button class="btn-big secondary" onclick="exportExcel()">📥 Descargar plantilla Excel</button>
+    <button class="btn-big secondary" onclick="exportData()">📤 Exportar todos los datos (Excel)</button>
+    <button class="btn-big secondary" onclick="document.getElementById('import-file').click()">📂 Importar desde Excel</button>
+    <input type="file" id="import-file" accept=".xlsx,.csv" style="display:none" onchange="importExcel(event)">
+    <button class="btn-big secondary" onclick="loadSampleData()">🎯 Cargar datos de ejemplo</button>
+    <button class="btn-big danger" onclick="confirmClearAll()">🗑️ Borrar todos los datos</button>
+    <div class="help-text" style="margin-top: 20px; text-align: center;">
+      Versión Prototipo · Etapa 1<br>
+      Los datos se guardan automáticamente en tu celular
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Navigation -->
+<div class="bottom-nav">
+  <button class="nav-btn active" data-page="birds" onclick="showPage('birds')">
+    <span class="icon">🐓</span><span>Aves</span>
+  </button>
+  <button class="nav-btn" data-page="tree" onclick="showPage('tree')">
+    <span class="icon">🌳</span><span>Árbol</span>
+  </button>
+  <button class="nav-btn" data-page="zones" onclick="showPage('zones')">
+    <span class="icon">📍</span><span>Zonas</span>
+  </button>
+  <button class="nav-btn" data-page="inventory" onclick="showPage('inventory')">
+    <span class="icon">💰</span><span>Costos</span>
+  </button>
+  <button class="nav-btn" data-page="pending" onclick="showPage('pending')">
+    <span class="icon">⚠️</span><span>Alertas</span>
+  </button>
+  <button class="nav-btn" data-page="more" onclick="showPage('more')">
+    <span class="icon">⚙️</span><span>Más</span>
+  </button>
+</div>
+
+<!-- MODAL: FORMULARIO DE AVE -->
+<div class="modal-overlay" id="modal-bird">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-bird')">Cancelar</button>
+      <div class="modal-title" id="bird-form-title">Nueva Ave</div>
+      <button class="modal-btn primary" onclick="saveBird()">Guardar</button>
+    </div>
+    <div class="modal-body">
+      <div class="photo-upload">
+        <div class="photo-preview" id="photo-preview" onclick="document.getElementById('photo-input').click()">
+          <span id="photo-placeholder">📷</span>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
+        <button class="photo-btn" onclick="document.getElementById('photo-input').click()">Agregar foto</button>
+        <button class="photo-btn" onclick="clearPhoto()" id="clear-photo-btn" style="display:none; color:#ff3b30;">Quitar</button>
+      </div>
+
+      <div class="form-section-title">Identificación</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">N° Placa <span class="required">*</span></label>
+          <input type="text" class="form-input" id="f-placa" placeholder="Ej: 001">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-input" id="f-nombre" placeholder="Opcional">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Género</label>
+          <select class="form-select" id="f-genero">
+            <option value="Gallo">Gallo</option>
+            <option value="Gallina">Gallina</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Color</label>
+          <select class="form-select" id="f-color"></select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Línea/Raza</label>
+          <input type="text" class="form-input" id="f-linea" placeholder="Ej: Kelso x Sweater">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Nacimiento</label>
+          <input type="date" class="form-input" id="f-nacimiento">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Peso (kg)</label>
+          <input type="number" step="0.01" class="form-input" id="f-peso" placeholder="Ej: 2.30">
+        </div>
+      </div>
+
+      <div class="form-section-title">Genealogía</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Padre</label>
+          <input type="text" class="form-input" id="f-padre" placeholder="Placa o nombre">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Madre</label>
+          <input type="text" class="form-input" id="f-madre" placeholder="Placa o nombre">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Origen</label>
+          <input type="text" class="form-input" id="f-origen" placeholder="Criador de origen">
+        </div>
+      </div>
+
+      <div class="form-section-title">Estado Actual</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Estado</label>
+          <select class="form-select" id="f-estado">
+            <option>En cuido</option>
+            <option>Cambio de pluma</option>
+            <option>Moviéndose</option>
+            <option>Entrenando</option>
+            <option>Recuperación</option>
+            <option>Reproducción</option>
+            <option>Descanso</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Zona</label>
+          <select class="form-select" id="f-zona"></select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Vital</label>
+          <select class="form-select" id="f-vital">
+            <option value="vivo">Vivo</option>
+            <option value="muerto">Muerto</option>
+            <option value="vendido">Vendido</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section-title">Salud</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Vitaminas/Medicina</label>
+          <input type="text" class="form-input" id="f-vitaminas" placeholder="Ej: Complejo B">
+        </div>
+        <div class="form-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <label class="form-label">Problema de salud</label>
+          <textarea class="form-input full" id="f-problema" placeholder="Si lo describes aquí se creará un recordatorio automático" style="width: 100%;"></textarea>
+        </div>
+      </div>
+
+      <div class="form-section-title">Notas</div>
+      <div class="form-section">
+        <div class="form-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <textarea class="form-input full" id="f-notas" placeholder="Cualquier observación..." style="width: 100%;"></textarea>
+        </div>
+      </div>
+
+      <button class="btn-big danger" id="delete-bird-btn" onclick="deleteCurrentBird()" style="display:none; margin-top: 20px;">Eliminar Ave</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DETALLE DE AVE -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-detail')">Cerrar</button>
+      <div class="modal-title">Detalle</div>
+      <button class="modal-btn primary" onclick="editCurrentBird()">Editar</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<!-- MODAL: FORMULARIO DE PELEA -->
+<div class="modal-overlay" id="modal-fight">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-fight')">Cancelar</button>
+      <div class="modal-title">Nueva Pelea</div>
+      <button class="modal-btn primary" onclick="saveFight()">Guardar</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-input" id="ff-fecha">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Lugar</label>
+          <input type="text" class="form-input" id="ff-lugar" placeholder="Cancha/Plaza">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Rival</label>
+          <input type="text" class="form-input" id="ff-rival" placeholder="Nombre/placa rival">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Peso (kg)</label>
+          <input type="number" step="0.01" class="form-input" id="ff-peso">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Resultado</label>
+          <select class="form-select" id="ff-resultado">
+            <option value="W">Gana</option>
+            <option value="T">Tablas</option>
+            <option value="L">Pierde</option>
+          </select>
+        </div>
+        <div class="form-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <label class="form-label">Notas</label>
+          <textarea class="form-input full" id="ff-notas" style="width:100%"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: GASTO -->
+<div class="modal-overlay" id="modal-inv">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-inv')">Cancelar</button>
+      <div class="modal-title">Nuevo Gasto</div>
+      <button class="modal-btn primary" onclick="saveInv()">Guardar</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Categoría</label>
+          <select class="form-select" id="iv-cat">
+            <option>Alimentos</option>
+            <option>Insumos</option>
+            <option>Vitaminas</option>
+            <option>Medicinas</option>
+            <option>Personal</option>
+            <option>Otros</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Concepto</label>
+          <input type="text" class="form-input" id="iv-nombre" placeholder="Ej: Maíz">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Cantidad</label>
+          <input type="text" class="form-input" id="iv-cant" placeholder="Ej: 50 lb">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Costo ($)</label>
+          <input type="number" step="0.01" class="form-input" id="iv-costo" placeholder="0.00">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-input" id="iv-fecha">
+        </div>
+        <div class="form-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <label class="form-label">Notas</label>
+          <textarea class="form-input full" id="iv-notas" style="width:100%"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmación -->
+<div class="modal-overlay center" id="modal-confirm">
+  <div class="confirm-dialog">
+    <h3 id="confirm-title">¿Estás seguro?</h3>
+    <p id="confirm-text">Esta acción no se puede deshacer.</p>
+    <div class="confirm-buttons">
+      <button class="btn-big secondary" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn-big danger" id="confirm-yes-btn">Sí, eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =========== DATOS ============
+const COLORES = ["Colorado","Cenizo","Senizo","Giro","Giro negro","Giro giro","Hatch","Kelso","Sweater","Pinto","Búcaro","Melado","Canelo","Jiro","Cenizo plateado","Cenizo azul","Negro","Negro pecho colorado","Pecho negro","Plateado","Dorado","Barrado","Garganta negra","Garganta colorada","Mugre","Jabao","Asil","Radio","Rubio","Trigueño","Albañil","Tostado","Cenizo humo","Azul","Azul acero","Blanco","Blanco sucio","Moro","Morocho","Chispeado","Manchado","Carey","Coliblanco","Colinegro","Colirubio","Cara blanca","Cara roja","Patas amarillas","Patas verdes","Pico hueso","Pico negro","Pinto colorado","Pinto negro","Ceniciento","Café quemado","Chocolate","Castaño","Leonado","Amarillo","Bronceado","Acerado","Veteado","Mil flores","Ala de pato","Garganta de oro","Cola de golondrina"];
+
+// =========== ESTADO ============
+let state = {
+  birds: [],
+  zones: [{id:'z1',name:'Zona A'},{id:'z2',name:'Zona B'},{id:'z3',name:'Zona C'},{id:'z4',name:'Zona D'}],
+  inventory: [],
+  pending: [],
+  currentBirdId: null,
+  editingBirdId: null,
+  currentFilter: 'all',
+  confirmCallback: null
+};
+
+// =========== STORAGE (localStorage para PWA) ============
+const STORAGE_KEY = 'criadero-data';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      state.birds = parsed.birds || [];
+      state.zones = parsed.zones || state.zones;
+      state.inventory = parsed.inventory || [];
+      state.pending = parsed.pending || [];
+    }
+  } catch(e) { console.warn('Error cargando:', e); }
+}
+
+function saveState() {
+  try {
+    const data = {
+      birds: state.birds,
+      zones: state.zones,
+      inventory: state.inventory,
+      pending: state.pending
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {
+    console.error('Error guardando:', e);
+    if (e.name === 'QuotaExceededError') {
+      toast('⚠️ Memoria llena. Usa fotos más pequeñas.');
+    }
+  }
+}
+
+// =========== UTILIDADES ============
+function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector(`.nav-btn[data-page="${name}"]`).classList.add('active');
+  if (name === 'tree') populateTreeSelect();
+  if (name === 'zones') renderZones();
+  if (name === 'inventory') renderInventory();
+  if (name === 'pending') renderPending();
+  window.scrollTo(0,0);
+}
+function setFilter(f) {
+  state.currentFilter = f;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+  renderBirds();
+}
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function askConfirm(title, text, callback) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  state.confirmCallback = callback;
+  openModal('modal-confirm');
+}
+document.getElementById('confirm-yes-btn').onclick = () => {
+  closeModal('modal-confirm');
+  if (state.confirmCallback) state.confirmCallback();
+};
+
+// =========== AVES ============
+let tempPhoto = null;
+
+function openBirdForm(birdId = null) {
+  state.editingBirdId = birdId;
+  tempPhoto = null;
+
+  // Llenar selects
+  const colorSel = document.getElementById('f-color');
+  colorSel.innerHTML = '<option value="">--</option>' + COLORES.map(c => `<option>${c}</option>`).join('');
+  const zonaSel = document.getElementById('f-zona');
+  zonaSel.innerHTML = '<option value="">--</option>' + state.zones.map(z => `<option value="${z.id}">${z.name}</option>`).join('');
+
+  if (birdId) {
+    const b = state.birds.find(x => x.id === birdId);
+    if (!b) return;
+    document.getElementById('bird-form-title').textContent = 'Editar Ave';
+    document.getElementById('delete-bird-btn').style.display = 'block';
+    document.getElementById('f-placa').value = b.placa || '';
+    document.getElementById('f-nombre').value = b.nombre || '';
+    document.getElementById('f-genero').value = b.genero || 'Gallo';
+    document.getElementById('f-color').value = b.color || '';
+    document.getElementById('f-linea').value = b.linea || '';
+    document.getElementById('f-nacimiento').value = b.nacimiento || '';
+    document.getElementById('f-peso').value = b.peso || '';
+    document.getElementById('f-padre').value = b.padre || '';
+    document.getElementById('f-madre').value = b.madre || '';
+    document.getElementById('f-origen').value = b.origen || '';
+    document.getElementById('f-estado').value = b.estado || 'En cuido';
+    document.getElementById('f-zona').value = b.zona || '';
+    document.getElementById('f-vital').value = b.vital || 'vivo';
+    document.getElementById('f-vitaminas').value = b.vitaminas || '';
+    document.getElementById('f-problema').value = '';
+    document.getElementById('f-notas').value = b.notas || '';
+    if (b.foto) {
+      document.getElementById('photo-preview').innerHTML = `<img src="${b.foto}">`;
+      document.getElementById('photo-preview').classList.add('has-photo');
+      document.getElementById('clear-photo-btn').style.display = 'inline-block';
+      tempPhoto = b.foto;
+    } else {
+      resetPhotoUI();
+    }
+  } else {
+    document.getElementById('bird-form-title').textContent = 'Nueva Ave';
+    document.getElementById('delete-bird-btn').style.display = 'none';
+    ['f-placa','f-nombre','f-linea','f-nacimiento','f-peso','f-padre','f-madre','f-origen','f-vitaminas','f-problema','f-notas'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-genero').value = 'Gallo';
+    document.getElementById('f-color').value = '';
+    document.getElementById('f-estado').value = 'En cuido';
+    document.getElementById('f-zona').value = '';
+    document.getElementById('f-vital').value = 'vivo';
+    resetPhotoUI();
+  }
+  openModal('modal-bird');
+}
+
+function resetPhotoUI() {
+  document.getElementById('photo-preview').innerHTML = '<span>📷</span>';
+  document.getElementById('photo-preview').classList.remove('has-photo');
+  document.getElementById('clear-photo-btn').style.display = 'none';
+  tempPhoto = null;
+}
+
+function handlePhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    // Reducir imagen para no llenar storage
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxSize = 600;
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
+      else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      tempPhoto = canvas.toDataURL('image/jpeg', 0.7);
+      document.getElementById('photo-preview').innerHTML = `<img src="${tempPhoto}">`;
+      document.getElementById('photo-preview').classList.add('has-photo');
+      document.getElementById('clear-photo-btn').style.display = 'inline-block';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPhoto() { resetPhotoUI(); }
+
+async function saveBird() {
+  const placa = document.getElementById('f-placa').value.trim();
+  if (!placa) { toast('⚠️ Debes ingresar el número de placa'); return; }
+
+  const data = {
+    placa: placa,
+    nombre: document.getElementById('f-nombre').value.trim(),
+    genero: document.getElementById('f-genero').value,
+    color: document.getElementById('f-color').value,
+    linea: document.getElementById('f-linea').value.trim(),
+    nacimiento: document.getElementById('f-nacimiento').value,
+    peso: document.getElementById('f-peso').value,
+    padre: document.getElementById('f-padre').value.trim(),
+    madre: document.getElementById('f-madre').value.trim(),
+    origen: document.getElementById('f-origen').value.trim(),
+    estado: document.getElementById('f-estado').value,
+    zona: document.getElementById('f-zona').value,
+    vital: document.getElementById('f-vital').value,
+    vitaminas: document.getElementById('f-vitaminas').value.trim(),
+    notas: document.getElementById('f-notas').value.trim(),
+    foto: tempPhoto
+  };
+
+  const problema = document.getElementById('f-problema').value.trim();
+
+  if (state.editingBirdId) {
+    const idx = state.birds.findIndex(x => x.id === state.editingBirdId);
+    if (idx >= 0) {
+      data.id = state.editingBirdId;
+      data.fights = state.birds[idx].fights || [];
+      data.healthLog = state.birds[idx].healthLog || [];
+      state.birds[idx] = data;
+    }
+  } else {
+    data.id = uid();
+    data.fights = [];
+    data.healthLog = [];
+    state.birds.push(data);
+  }
+
+  if (problema) {
+    state.pending.push({
+      id: uid(),
+      birdId: data.id,
+      type: 'salud',
+      title: `Problema de salud: ${data.placa}`,
+      desc: problema,
+      date: new Date().toISOString(),
+      done: false
+    });
+    if (!data.healthLog) data.healthLog = [];
+    data.healthLog.push({date: new Date().toISOString(), text: problema});
+    toast('✅ Guardado. Se creó un recordatorio en Alertas');
+  } else {
+    toast('✅ Ave guardada');
+  }
+
+  await saveState();
+  renderBirds();
+  closeModal('modal-bird');
+}
+
+function deleteCurrentBird() {
+  if (!state.editingBirdId) return;
+  askConfirm('¿Eliminar ave?', 'Esta acción no se puede deshacer.', async () => {
+    state.birds = state.birds.filter(b => b.id !== state.editingBirdId);
+    state.pending = state.pending.filter(p => p.birdId !== state.editingBirdId);
+    await saveState();
+    renderBirds();
+    closeModal('modal-bird');
+    toast('🗑️ Ave eliminada');
+  });
+}
+
+function renderBirds() {
+  const q = (document.getElementById('search-input').value || '').toLowerCase();
+  const list = document.getElementById('bird-list');
+  let birds = state.birds.filter(b => {
+    if (state.currentFilter === 'Gallo' && b.genero !== 'Gallo') return false;
+    if (state.currentFilter === 'Gallina' && b.genero !== 'Gallina') return false;
+    if (state.currentFilter === 'vivo' && b.vital !== 'vivo') return false;
+    if (state.currentFilter === 'muerto' && b.vital !== 'muerto') return false;
+    if (state.currentFilter === 'vendido' && b.vital !== 'vendido') return false;
+    if (q) {
+      const txt = `${b.placa} ${b.nombre} ${b.color} ${b.linea}`.toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+  birds.sort((a,b) => (a.placa || '').localeCompare(b.placa || '', undefined, {numeric: true}));
+
+  if (birds.length === 0) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="big-icon">🐓</div>
+      <h2>${state.birds.length === 0 ? 'Empieza agregando un ave' : 'No hay resultados'}</h2>
+      <p>${state.birds.length === 0 ? 'Toca el botón + arriba a la derecha' : 'Prueba con otro filtro o búsqueda'}</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = birds.map(b => {
+    const photoHtml = b.foto ? `<img src="${b.foto}">` : (b.genero === 'Gallo' ? '🐓' : '🐔');
+    const vitalBadge = b.vital === 'muerto' ? '<span class="badge dead">✝ Muerto</span>' :
+                       b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' : '';
+    return `<div class="bird-item" onclick="showBirdDetail('${b.id}')">
+      <div class="bird-photo">${photoHtml}</div>
+      <div class="bird-info">
+        <div class="bird-name">${b.placa}${b.nombre ? ' · ' + b.nombre : ''}</div>
+        <div class="bird-meta">${b.genero} · ${b.color || 'Sin color'} ${vitalBadge}</div>
+      </div>
+      <div class="bird-chevron">›</div>
+    </div>`;
+  }).join('');
+}
+
+function showBirdDetail(id) {
+  const b = state.birds.find(x => x.id === id);
+  if (!b) return;
+  state.currentBirdId = id;
+  const zone = state.zones.find(z => z.id === b.zona);
+  const photoHtml = b.foto ? `<img src="${b.foto}">` : (b.genero === 'Gallo' ? '🐓' : '🐔');
+  const fights = b.fights || [];
+  const stats = { W: 0, T: 0, L: 0 };
+  fights.forEach(f => { if (stats[f.resultado] !== undefined) stats[f.resultado]++; });
+
+  const vitalBadge = b.vital === 'muerto' ? '<span class="badge dead">✝ Muerto</span>' :
+                     b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' :
+                     '<span class="badge healthy">Vivo</span>';
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-photo">${photoHtml}</div>
+    <div class="detail-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h3 style="margin:0;">${b.placa}${b.nombre ? ' · ' + b.nombre : ''}</h3>
+        ${vitalBadge}
+      </div>
+      <div class="detail-row"><span class="label">Género</span><span class="value">${b.genero}</span></div>
+      <div class="detail-row"><span class="label">Color</span><span class="value">${b.color || '—'}</span></div>
+      <div class="detail-row"><span class="label">Línea/Raza</span><span class="value">${b.linea || '—'}</span></div>
+      <div class="detail-row"><span class="label">Nacimiento</span><span class="value">${b.nacimiento || '—'}</span></div>
+      <div class="detail-row"><span class="label">Peso</span><span class="value">${b.peso ? b.peso + ' kg' : '—'}</span></div>
+      <div class="detail-row"><span class="label">Estado</span><span class="value">${b.estado || '—'}</span></div>
+      <div class="detail-row"><span class="label">Zona</span><span class="value">${zone ? zone.name : '—'}</span></div>
+    </div>
+    <div class="detail-section">
+      <h3>Genealogía</h3>
+      <div class="detail-row"><span class="label">Padre</span><span class="value">${b.padre || '—'}</span></div>
+      <div class="detail-row"><span class="label">Madre</span><span class="value">${b.madre || '—'}</span></div>
+      <div class="detail-row"><span class="label">Origen</span><span class="value">${b.origen || '—'}</span></div>
+      <button class="btn-big secondary" style="margin-top:12px;" onclick="closeModal('modal-detail'); showPage('tree'); document.getElementById('tree-select').value='${b.id}'; renderTree();">Ver árbol genealógico</button>
+    </div>
+    <div class="detail-section">
+      <h3>Salud</h3>
+      <div class="detail-row"><span class="label">Vitaminas/Medicina</span><span class="value">${b.vitaminas || '—'}</span></div>
+      ${(b.healthLog || []).length > 0 ? '<div style="margin-top:10px; font-size:13px; color:#8e8e93;">Historial:</div>' + (b.healthLog || []).slice().reverse().map(h => `<div style="font-size:14px; padding:6px 0; border-bottom:1px solid #f2f2f7;">${new Date(h.date).toLocaleDateString()} · ${h.text}</div>`).join('') : ''}
+    </div>
+    <div class="detail-section">
+      <h3>Peleas (${fights.length})</h3>
+      <div style="display:flex; gap:14px; margin-bottom:12px; font-size:14px;">
+        <span class="result-W">Ganadas: ${stats.W}</span>
+        <span class="result-T">Tablas: ${stats.T}</span>
+        <span class="result-L">Perdidas: ${stats.L}</span>
+      </div>
+      ${fights.length > 0 ? fights.slice().reverse().map(f => `
+        <div class="fight-item">
+          <div class="fight-header">
+            <span>${f.fecha || '—'} · ${f.lugar || '—'}</span>
+            <span class="result-${f.resultado}">${f.resultado === 'W' ? 'GANA' : f.resultado === 'T' ? 'TABLAS' : 'PIERDE'}</span>
+          </div>
+          <div style="font-size:13px; color:#8e8e93;">vs ${f.rival || '—'} ${f.peso ? '· ' + f.peso + ' kg' : ''}</div>
+          ${f.notas ? `<div style="font-size:13px; margin-top:4px;">${f.notas}</div>` : ''}
+        </div>
+      `).join('') : '<div style="color:#8e8e93; font-size:14px;">Sin peleas registradas</div>'}
+      <button class="btn-big secondary" style="margin-top:12px;" onclick="openFightForm()">+ Agregar pelea</button>
+    </div>
+    ${b.notas ? `<div class="detail-section"><h3>Notas</h3><div style="font-size:14px;">${b.notas}</div></div>` : ''}
+  `;
+  openModal('modal-detail');
+}
+
+function editCurrentBird() {
+  closeModal('modal-detail');
+  openBirdForm(state.currentBirdId);
+}
+
+// =========== PELEAS ============
+function openFightForm() {
+  document.getElementById('ff-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('ff-lugar').value = '';
+  document.getElementById('ff-rival').value = '';
+  document.getElementById('ff-peso').value = '';
+  document.getElementById('ff-resultado').value = 'W';
+  document.getElementById('ff-notas').value = '';
+  openModal('modal-fight');
+}
+
+async function saveFight() {
+  const b = state.birds.find(x => x.id === state.currentBirdId);
+  if (!b) return;
+  if (!b.fights) b.fights = [];
+  b.fights.push({
+    id: uid(),
+    fecha: document.getElementById('ff-fecha').value,
+    lugar: document.getElementById('ff-lugar').value.trim(),
+    rival: document.getElementById('ff-rival').value.trim(),
+    peso: document.getElementById('ff-peso').value,
+    resultado: document.getElementById('ff-resultado').value,
+    notas: document.getElementById('ff-notas').value.trim()
+  });
+  await saveState();
+  closeModal('modal-fight');
+  showBirdDetail(state.currentBirdId);
+  toast('✅ Pelea registrada');
+}
+
+// =========== ÁRBOL GENEALÓGICO ============
+function populateTreeSelect() {
+  const sel = document.getElementById('tree-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- Elige un ave --</option>' +
+    state.birds.slice().sort((a,b) => (a.placa || '').localeCompare(b.placa || '', undefined, {numeric:true}))
+      .map(b => `<option value="${b.id}">${b.placa}${b.nombre ? ' · ' + b.nombre : ''}</option>`).join('');
+  if (current) sel.value = current;
+}
+
+function findBirdByRef(ref) {
+  if (!ref) return null;
+  const r = ref.toLowerCase().trim();
+  return state.birds.find(b => (b.placa || '').toLowerCase() === r || (b.nombre || '').toLowerCase() === r);
+}
+
+function nodeHtml(bird, ref, role, klass = '') {
+  if (bird) {
+    return `<div class="tree-node ${klass} ${bird.genero === 'Gallo' ? 'male' : 'female'}" onclick="document.getElementById('tree-select').value='${bird.id}'; renderTree();">
+      <div class="placa">${bird.placa}</div>
+      ${bird.nombre ? `<div class="nombre">${bird.nombre}</div>` : ''}
+    </div>`;
+  } else if (ref) {
+    return `<div class="tree-node ${klass}">
+      <div class="placa" style="font-size:13px;">${ref}</div>
+      <div class="nombre">(no en sistema)</div>
+    </div>`;
+  } else {
+    return `<div class="tree-node ${klass}" style="opacity:0.5;">
+      <div class="placa" style="font-size:13px;">—</div>
+      <div class="nombre">${role}</div>
+    </div>`;
+  }
+}
+
+function renderTree() {
+  const id = document.getElementById('tree-select').value;
+  const target = document.getElementById('tree-display');
+  if (!id) { target.innerHTML = ''; return; }
+  const b = state.birds.find(x => x.id === id);
+  if (!b) { target.innerHTML = ''; return; }
+
+  // Hacia atrás
+  const padre = findBirdByRef(b.padre);
+  const madre = findBirdByRef(b.madre);
+  const pp = padre ? findBirdByRef(padre.padre) : null;
+  const pm = padre ? findBirdByRef(padre.madre) : null;
+  const mp = madre ? findBirdByRef(madre.padre) : null;
+  const mm = madre ? findBirdByRef(madre.madre) : null;
+
+  // Hacia adelante: hijos
+  const hijos = state.birds.filter(x => {
+    return findBirdByRef(x.padre)?.id === b.id || findBirdByRef(x.madre)?.id === b.id;
+  });
+
+  // Nietos
+  const nietos = [];
+  hijos.forEach(h => {
+    state.birds.forEach(x => {
+      if (findBirdByRef(x.padre)?.id === h.id || findBirdByRef(x.madre)?.id === h.id) {
+        nietos.push(x);
+      }
+    });
+  });
+
+  target.innerHTML = `
+    <div class="tree-container">
+      <div class="tree-label">Abuelos paternos · Abuelos maternos</div>
+      <div class="tree-level">
+        ${nodeHtml(pp, padre?.padre, 'Abuelo P.')}
+        ${nodeHtml(pm, padre?.madre, 'Abuela P.')}
+        ${nodeHtml(mp, madre?.padre, 'Abuelo M.')}
+        ${nodeHtml(mm, madre?.madre, 'Abuela M.')}
+      </div>
+      <div class="tree-label">Padres</div>
+      <div class="tree-level">
+        ${nodeHtml(padre, b.padre, 'Padre')}
+        ${nodeHtml(madre, b.madre, 'Madre')}
+      </div>
+      <div class="tree-label">Esta ave</div>
+      <div class="tree-level">
+        ${nodeHtml(b, null, '', 'center')}
+      </div>
+      ${hijos.length > 0 ? `
+      <div class="tree-label">Hijos (${hijos.length})</div>
+      <div class="tree-level">
+        ${hijos.map(h => nodeHtml(h, null, '')).join('')}
+      </div>` : '<div class="tree-label" style="margin-top:20px;">Sin descendencia registrada</div>'}
+      ${nietos.length > 0 ? `
+      <div class="tree-label">Nietos (${nietos.length})</div>
+      <div class="tree-level">
+        ${nietos.map(n => nodeHtml(n, null, '')).join('')}
+      </div>` : ''}
+    </div>
+    <div class="help-text">Toca cualquier ave del árbol para verla. Las líneas azules = machos, rosadas = hembras.</div>
+  `;
+}
+
+// =========== ZONAS ============
+function renderZones() {
+  const list = document.getElementById('zone-list');
+  list.innerHTML = state.zones.map(z => {
+    const count = state.birds.filter(b => b.zona === z.id && b.vital === 'vivo').length;
+    return `<div class="zone-card" onclick="editZone('${z.id}')">
+      <div class="zone-name">📍 ${z.name}</div>
+      <div class="zone-count">${count} ${count === 1 ? 'ave activa' : 'aves activas'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function addZone() {
+  const name = prompt('Nombre de la nueva zona:');
+  if (!name) return;
+  state.zones.push({id: uid(), name: name.trim()});
+  await saveState();
+  renderZones();
+  toast('✅ Zona agregada');
+}
+
+async function editZone(id) {
+  const z = state.zones.find(x => x.id === id);
+  if (!z) return;
+  const action = prompt(`Zona: ${z.name}\n\nEscribe un nuevo nombre, o escribe BORRAR para eliminarla:`, z.name);
+  if (action === null) return;
+  if (action.toUpperCase() === 'BORRAR') {
+    if (state.birds.some(b => b.zona === id)) {
+      toast('⚠️ Hay aves en esta zona. Cámbialas primero.');
+      return;
+    }
+    state.zones = state.zones.filter(x => x.id !== id);
+    toast('🗑️ Zona eliminada');
+  } else if (action.trim()) {
+    z.name = action.trim();
+    toast('✅ Zona actualizada');
+  }
+  await saveState();
+  renderZones();
+}
+
+// =========== INVENTARIO ============
+function openInvForm() {
+  document.getElementById('iv-cat').value = 'Alimentos';
+  document.getElementById('iv-nombre').value = '';
+  document.getElementById('iv-cant').value = '';
+  document.getElementById('iv-costo').value = '';
+  document.getElementById('iv-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('iv-notas').value = '';
+  openModal('modal-inv');
+}
+
+async function saveInv() {
+  const nombre = document.getElementById('iv-nombre').value.trim();
+  const costo = parseFloat(document.getElementById('iv-costo').value);
+  if (!nombre) { toast('⚠️ Falta el concepto'); return; }
+  if (isNaN(costo)) { toast('⚠️ Falta el costo'); return; }
+  state.inventory.push({
+    id: uid(),
+    categoria: document.getElementById('iv-cat').value,
+    nombre: nombre,
+    cantidad: document.getElementById('iv-cant').value.trim(),
+    costo: costo,
+    fecha: document.getElementById('iv-fecha').value,
+    notas: document.getElementById('iv-notas').value.trim()
+  });
+  await saveState();
+  renderInventory();
+  closeModal('modal-inv');
+  toast('✅ Gasto agregado');
+}
+
+async function deleteInvItem(id) {
+  askConfirm('¿Eliminar gasto?', 'No se puede deshacer.', async () => {
+    state.inventory = state.inventory.filter(x => x.id !== id);
+    await saveState();
+    renderInventory();
+    toast('🗑️ Gasto eliminado');
+  });
+}
+
+function renderInventory() {
+  const total = state.inventory.reduce((s, i) => s + (i.costo || 0), 0);
+  document.getElementById('total-inv').textContent = '$' + total.toFixed(2);
+  const cats = {};
+  state.inventory.forEach(i => {
+    if (!cats[i.categoria]) cats[i.categoria] = [];
+    cats[i.categoria].push(i);
+  });
+  const list = document.getElementById('inv-list');
+  if (state.inventory.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="big-icon">💰</div><h2>Sin gastos aún</h2><p>Empieza agregando uno</p></div>';
+    return;
+  }
+  list.innerHTML = Object.keys(cats).sort().map(cat => {
+    const total = cats[cat].reduce((s, i) => s + (i.costo || 0), 0);
+    return `<div class="inv-category">
+      <div class="inv-category-header">
+        <span class="inv-category-title">${cat}</span>
+        <span class="inv-total">$${total.toFixed(2)}</span>
+      </div>
+      ${cats[cat].slice().reverse().map(i => `
+        <div class="inv-item" onclick="deleteInvItem('${i.id}')">
+          <div class="inv-item-info">
+            <div class="name">${i.nombre}</div>
+            <div class="meta">${i.cantidad ? i.cantidad + ' · ' : ''}${i.fecha || ''}</div>
+          </div>
+          <div class="inv-item-cost">$${(i.costo || 0).toFixed(2)}</div>
+        </div>
+      `).join('')}
+    </div>`;
+  }).join('') + '<div class="help-text">Toca un gasto para eliminarlo</div>';
+}
+
+// =========== PENDIENTES ============
+function renderPending() {
+  const list = document.getElementById('pending-list');
+  const open = state.pending.filter(p => !p.done);
+  if (open.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="big-icon">✅</div><h2>Todo al día</h2><p>No hay alertas pendientes</p></div>';
+    return;
+  }
+  list.innerHTML = open.slice().reverse().map(p => `
+    <div class="pending-item">
+      <div class="pending-icon">⚠️</div>
+      <div class="pending-content">
+        <div class="pending-title">${p.title}</div>
+        <div class="pending-desc">${p.desc}</div>
+        <div class="pending-date">${new Date(p.date).toLocaleString()}</div>
+        <div class="pending-actions">
+          ${p.birdId ? `<button class="btn-small" style="background:#007aff; color:white;" onclick="closeModal('modal-detail'); showPage('birds'); showBirdDetail('${p.birdId}')">Ver ave</button>` : ''}
+          <button class="btn-small done" onclick="markPendingDone('${p.id}')">✓ Resuelto</button>
+          <button class="btn-small delete" onclick="deletePending('${p.id}')">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function markPendingDone(id) {
+  const p = state.pending.find(x => x.id === id);
+  if (p) { p.done = true; await saveState(); renderPending(); toast('✅ Resuelto'); }
+}
+
+async function deletePending(id) {
+  state.pending = state.pending.filter(x => x.id !== id);
+  await saveState();
+  renderPending();
+  toast('🗑️ Eliminado');
+}
+
+// =========== EXCEL EXPORT/IMPORT ============
+const TEMPLATE_HEADERS = ['Placa','Nombre','Genero','Color','Linea','Nacimiento','Peso','Padre','Madre','Origen','Estado','Zona','Vital','Vitaminas','Notas'];
+
+function exportExcel() {
+  // Plantilla vacía (CSV)
+  let csv = '\ufeff' + TEMPLATE_HEADERS.join(',') + '\n';
+  csv += '001,Ejemplo,Gallo,Colorado,Kelso x Sweater,2024-01-15,2.30,P001,M001,Criador X,En cuido,Zona A,vivo,Complejo B,Ejemplo de fila\n';
+  downloadFile(csv, 'plantilla_criadero.csv', 'text/csv;charset=utf-8;');
+  toast('📥 Plantilla descargada');
+}
+
+function exportData() {
+  let csv = '\ufeff' + TEMPLATE_HEADERS.join(',') + '\n';
+  state.birds.forEach(b => {
+    const zone = state.zones.find(z => z.id === b.zona);
+    const row = [b.placa, b.nombre, b.genero, b.color, b.linea, b.nacimiento, b.peso, b.padre, b.madre, b.origen, b.estado, zone ? zone.name : '', b.vital, b.vitaminas, (b.notas || '').replace(/[\r\n]+/g, ' ')];
+    csv += row.map(v => {
+      v = (v || '').toString();
+      if (v.includes(',') || v.includes('"')) return '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    }).join(',') + '\n';
+  });
+  downloadFile(csv, 'criadero_export.csv', 'text/csv;charset=utf-8;');
+  toast('📤 Datos exportados');
+}
+
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  text = text.replace(/^\ufeff/, '');
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQuotes = false;
+      else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function importExcel(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      const rows = parseCSV(ev.target.result);
+      if (rows.length < 2) { toast('⚠️ Archivo vacío'); return; }
+      const headers = rows[0].map(h => h.trim());
+      const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+      let added = 0;
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r[idx('Placa')]) continue;
+        const zoneName = r[idx('Zona')];
+        let zone = state.zones.find(z => z.name === zoneName);
+        if (zoneName && !zone) {
+          zone = {id: uid(), name: zoneName};
+          state.zones.push(zone);
+        }
+        state.birds.push({
+          id: uid(),
+          placa: r[idx('Placa')] || '',
+          nombre: r[idx('Nombre')] || '',
+          genero: r[idx('Genero')] || 'Gallo',
+          color: r[idx('Color')] || '',
+          linea: r[idx('Linea')] || '',
+          nacimiento: r[idx('Nacimiento')] || '',
+          peso: r[idx('Peso')] || '',
+          padre: r[idx('Padre')] || '',
+          madre: r[idx('Madre')] || '',
+          origen: r[idx('Origen')] || '',
+          estado: r[idx('Estado')] || 'En cuido',
+          zona: zone ? zone.id : '',
+          vital: r[idx('Vital')] || 'vivo',
+          vitaminas: r[idx('Vitaminas')] || '',
+          notas: r[idx('Notas')] || '',
+          fights: [],
+          healthLog: []
+        });
+        added++;
+      }
+      await saveState();
+      renderBirds();
+      toast(`✅ ${added} aves importadas`);
+    } catch(err) {
+      toast('⚠️ Error: revisa el formato');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+// =========== DATOS DE EJEMPLO ============
+async function loadSampleData() {
+  askConfirm('¿Cargar ejemplos?', 'Se agregarán 5 aves de muestra para que veas cómo funciona.', async () => {
+    const samples = [
+      {placa:'001', nombre:'El Rey', genero:'Gallo', color:'Colorado', linea:'Kelso puro', nacimiento:'2023-03-15', peso:'2.30', padre:'A100', madre:'A200', origen:'Criadero Don Pedro', estado:'Entrenando', zona:'z1', vital:'vivo', vitaminas:'Complejo B'},
+      {placa:'002', nombre:'Reina', genero:'Gallina', color:'Cenizo', linea:'Hatch', nacimiento:'2023-05-20', peso:'1.80', padre:'A150', madre:'A250', origen:'Propio', estado:'Reproducción', zona:'z2', vital:'vivo'},
+      {placa:'003', nombre:'Trueno', genero:'Gallo', color:'Giro', linea:'Sweater x Kelso', nacimiento:'2024-02-10', peso:'2.15', padre:'001', madre:'002', origen:'Propio', estado:'En cuido', zona:'z1', vital:'vivo'},
+      {placa:'004', nombre:'Rayo', genero:'Gallo', color:'Negro pecho colorado', linea:'Sweater x Kelso', nacimiento:'2024-02-10', peso:'2.20', padre:'001', madre:'002', origen:'Propio', estado:'Moviéndose', zona:'z3', vital:'vivo'},
+      {placa:'005', nombre:'Estrella', genero:'Gallina', color:'Pinto', linea:'Asil', nacimiento:'2024-06-01', peso:'1.70', padre:'003', madre:'002', origen:'Propio', estado:'Cambio de pluma', zona:'z2', vital:'vivo'}
+    ];
+    samples.forEach(s => {
+      state.birds.push({...s, id: uid(), fights: [], healthLog: []});
+    });
+    const rey = state.birds.find(b => b.placa === '001');
+    if (rey) {
+      rey.fights = [
+        {id:uid(), fecha:'2024-08-15', lugar:'Cancha Central', rival:'Negro de Juan', peso:'2.30', resultado:'W', notas:'Pelea limpia'},
+        {id:uid(), fecha:'2024-10-22', lugar:'Plaza del Sur', rival:'Giro de Pedro', peso:'2.28', resultado:'W', notas:''},
+        {id:uid(), fecha:'2025-01-10', lugar:'Cancha Central', rival:'Hatch grande', peso:'2.32', resultado:'T', notas:'Igualados'}
+      ];
+    }
+    await saveState();
+    renderBirds();
+    toast('✅ Ejemplos cargados');
+  });
+}
+
+function confirmClearAll() {
+  askConfirm('¿Borrar TODO?', 'Se eliminarán todas las aves, zonas, inventario y alertas. No se puede recuperar.', async () => {
+    state.birds = [];
+    state.zones = [{id:'z1',name:'Zona A'},{id:'z2',name:'Zona B'},{id:'z3',name:'Zona C'},{id:'z4',name:'Zona D'}];
+    state.inventory = [];
+    state.pending = [];
+    await saveState();
+    renderBirds();
+    showPage('birds');
+    toast('🗑️ Todo borrado');
+  });
+}
+
+// =========== INICIO ============
+loadState();
+renderBirds();
+
+// =========== SERVICE WORKER (PWA offline) ============
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW:', err));
+  });
+}
+</script>
+</body>
+</html>
