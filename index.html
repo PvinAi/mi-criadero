@@ -22,6 +22,34 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCe2FwuonnghNu5H9As65O-dtudnVFeWXI",
+  authDomain: "mi-criadero-ea258.firebaseapp.com",
+  projectId: "mi-criadero-ea258",
+  storageBucket: "mi-criadero-ea258.firebasestorage.app",
+  messagingSenderId: "1084308767268",
+  appId: "1:1084308767268:web:95f10a6f4ff783ec5f4eb1"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Exponer para uso global
+window.fb = {
+  auth, db,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail,
+  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp
+};
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f2f2f7; color: #1c1c1e; font-size: 17px; -webkit-font-smoothing: antialiased; }
@@ -194,9 +222,99 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   body { max-width: 500px; margin: 0 auto; box-shadow: 0 0 20px rgba(0,0,0,0.1); min-height: 100vh; background: #f2f2f7; }
   .bottom-nav { max-width: 500px; left: 50%; transform: translateX(-50%); }
 }
+
+/* ============ LOGIN ============ */
+.login-screen { display: none; min-height: 100vh; background: linear-gradient(135deg, #C0392B 0%, #8B0000 100%); padding: 40px 20px; align-items: center; justify-content: center; }
+.login-screen.active { display: flex; }
+.login-box { background: white; border-radius: 20px; padding: 30px 24px; width: 100%; max-width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+.login-logo { width: 100px; height: 100px; margin: 0 auto 16px; display: block; border-radius: 20px; }
+.login-title { text-align: center; font-size: 24px; font-weight: 700; margin-bottom: 4px; color: #1c1c1e; }
+.login-subtitle { text-align: center; font-size: 14px; color: #8e8e93; margin-bottom: 24px; }
+.login-input-group { margin-bottom: 14px; }
+.login-input-group label { display: block; font-size: 13px; color: #1c1c1e; margin-bottom: 6px; font-weight: 600; }
+.login-input { width: 100%; padding: 12px 14px; border: 1px solid #e5e5ea; border-radius: 10px; font-size: 16px; background: #f9f9fa; outline: none; }
+.login-input:focus { border-color: #C0392B; background: white; }
+.login-error { background: #ffe0de; color: #ff3b30; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: none; }
+.login-error.show { display: block; }
+.login-btn { width: 100%; padding: 14px; background: #C0392B; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.login-btn:active { background: #8B0000; }
+.login-btn:disabled { background: #c7c7cc; cursor: not-allowed; }
+.login-link { display: block; text-align: center; color: #007aff; font-size: 14px; margin-top: 14px; cursor: pointer; }
+.login-info { background: #f2f2f7; padding: 12px; border-radius: 8px; font-size: 12px; color: #8e8e93; margin-top: 16px; text-align: center; line-height: 1.5; }
+
+/* ============ APP (oculta hasta login) ============ */
+.app-content { display: none; }
+.app-content.active { display: block; }
+
+/* Estado de sincronización */
+.sync-status { position: fixed; top: 8px; right: 12px; padding: 4px 10px; background: rgba(0,0,0,0.7); color: white; border-radius: 12px; font-size: 11px; z-index: 1001; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.sync-status.show { opacity: 1; }
+
+/* User chip en header */
+.user-chip { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #f2f2f7; border-radius: 16px; font-size: 12px; color: #1c1c1e; cursor: pointer; }
+.user-chip-avatar { width: 22px; height: 22px; background: #C0392B; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; }
+.user-chip.admin-chip { background: #ffe0d4; color: #C0392B; }
+
+/* ============ ADMIN ============ */
+.admin-badge { display: inline-block; padding: 2px 8px; background: #C0392B; color: white; border-radius: 8px; font-size: 11px; font-weight: 600; margin-left: 6px; }
+.user-row { background: white; padding: 14px 16px; margin-bottom: 8px; border-radius: 10px; display: flex; gap: 12px; align-items: center; }
+.user-avatar { width: 44px; height: 44px; background: #C0392B; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+.user-row-info { flex: 1; min-width: 0; }
+.user-row-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-row-email { font-size: 12px; color: #8e8e93; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-row-meta { font-size: 11px; color: #8e8e93; margin-top: 4px; }
+.user-status-active { color: #34c759; }
+.user-status-suspended { color: #ff3b30; }
+.user-status-expired { color: #ff9500; }
+
+/* Loader */
+.loader { display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #C0392B; border-radius: 50%; animation: spin 1s linear infinite; vertical-align: middle; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.full-loader { position: fixed; inset: 0; background: rgba(255,255,255,0.95); display: none; align-items: center; justify-content: center; flex-direction: column; z-index: 9999; gap: 16px; }
+.full-loader.show { display: flex; }
+.full-loader .big-loader { width: 50px; height: 50px; border: 4px solid #f3f3f3; border-top: 4px solid #C0392B; border-radius: 50%; animation: spin 1s linear infinite; }
+.full-loader p { color: #8e8e93; font-size: 14px; }
 </style>
 </head>
 <body>
+
+<!-- Loader inicial -->
+<div class="full-loader show" id="full-loader">
+  <div class="big-loader"></div>
+  <p>Cargando Mi Criadero...</p>
+</div>
+
+<!-- PANTALLA DE LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <img src="icons/icon-192.png" alt="Mi Criadero" class="login-logo">
+    <div class="login-title">Mi Criadero</div>
+    <div class="login-subtitle">Control profesional de aves de combate</div>
+
+    <div class="login-error" id="login-error"></div>
+
+    <div class="login-input-group">
+      <label>Correo electrónico</label>
+      <input type="email" class="login-input" id="login-email" placeholder="tucorreo@ejemplo.com" autocomplete="email">
+    </div>
+    <div class="login-input-group">
+      <label>Contraseña</label>
+      <input type="password" class="login-input" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-link" onclick="forgotPassword()">¿Olvidaste tu contraseña?</div>
+    <div class="login-info">
+      ¿No tienes cuenta?<br>
+      Contacta al administrador para obtener tus credenciales de acceso.
+    </div>
+  </div>
+</div>
+
+<!-- Sync status -->
+<div class="sync-status" id="sync-status">Sincronizando...</div>
+
+<!-- CONTENIDO PRINCIPAL DE LA APP -->
+<div class="app-content" id="app-content">
 
 <!-- PÁGINA: AVES -->
 <div class="page active" id="page-birds">
@@ -282,16 +400,44 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
     <h2>⚙️ Más Opciones</h2>
   </div>
   <div class="page-content">
+    <div class="form-section" style="padding: 16px; margin-bottom: 16px;">
+      <div style="font-size: 13px; color: #8e8e93; margin-bottom: 4px;">USUARIO ACTUAL</div>
+      <div style="font-size: 16px; font-weight: 600;" id="more-user-name">—</div>
+      <div style="font-size: 13px; color: #8e8e93;" id="more-user-email">—</div>
+      <div style="font-size: 12px; color: #8e8e93; margin-top: 6px;" id="more-user-meta"></div>
+    </div>
+
+    <button class="btn-big secondary" id="admin-panel-btn" onclick="showPage('admin')" style="display:none;">👑 Panel de Administrador</button>
+    <button class="btn-big secondary" onclick="changePassword()">🔑 Cambiar mi contraseña</button>
     <button class="btn-big secondary" onclick="exportExcel()">📥 Descargar plantilla Excel</button>
-    <button class="btn-big secondary" onclick="exportData()">📤 Exportar todos los datos (Excel)</button>
+    <button class="btn-big secondary" onclick="exportData()">📤 Exportar mis datos (Excel)</button>
     <button class="btn-big secondary" onclick="document.getElementById('import-file').click()">📂 Importar desde Excel</button>
     <input type="file" id="import-file" accept=".xlsx,.csv" style="display:none" onchange="importExcel(event)">
-    <button class="btn-big secondary" onclick="loadSampleData()">🎯 Cargar datos de ejemplo</button>
-    <button class="btn-big danger" onclick="confirmClearAll()">🗑️ Borrar todos los datos</button>
+    <button class="btn-big danger" onclick="doLogout()">🚪 Cerrar sesión</button>
     <div class="help-text" style="margin-top: 20px; text-align: center;">
-      Versión Prototipo · Etapa 1<br>
-      Los datos se guardan automáticamente en tu celular
+      Mi Criadero · Etapa 3<br>
+      Tus datos están sincronizados en la nube
     </div>
+  </div>
+</div>
+
+<!-- PÁGINA: ADMIN (solo admin) -->
+<div class="page" id="page-admin">
+  <div class="page-header">
+    <h2>👑 Panel de Administrador</h2>
+    <p>Gestiona los usuarios del sistema</p>
+  </div>
+  <div class="page-content">
+    <button class="btn-big" onclick="openNewUserForm()">+ Crear nuevo usuario</button>
+    <div class="form-section" style="padding: 14px; margin-bottom: 16px; text-align: center;">
+      <div style="font-size: 13px; color: #8e8e93;">USUARIOS REGISTRADOS</div>
+      <div style="font-size: 24px; font-weight: 700; color: #C0392B;" id="admin-total-users">0</div>
+      <div style="font-size: 12px; color: #8e8e93;">
+        <span id="admin-active-users">0</span> activos ·
+        <span id="admin-suspended-users">0</span> suspendidos
+      </div>
+    </div>
+    <div id="admin-users-list"></div>
   </div>
 </div>
 
@@ -551,6 +697,90 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   </div>
 </div>
 
+<!-- MODAL: NUEVO USUARIO (admin) -->
+<div class="modal-overlay" id="modal-new-user">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-new-user')">Cancelar</button>
+      <div class="modal-title">Nuevo Usuario</div>
+      <button class="modal-btn primary" id="save-user-btn" onclick="saveNewUser()">Crear</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-text" style="background: #fff4d4; padding: 10px; border-radius: 8px; margin-bottom: 12px;">
+        ⚠️ <strong>Importante:</strong> Después de crear el usuario, copia los datos y entrégaselos al criador. La contraseña no se podrá ver de nuevo.
+      </div>
+      <div class="form-section-title">Datos del criador</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Nombre completo</label>
+          <input type="text" class="form-input" id="nu-name" placeholder="Pablo Pérez">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Correo</label>
+          <input type="email" class="form-input" id="nu-email" placeholder="correo@ejemplo.com">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Contraseña</label>
+          <input type="text" class="form-input" id="nu-password" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Teléfono</label>
+          <input type="tel" class="form-input" id="nu-phone" placeholder="Opcional">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Nombre del criadero</label>
+          <input type="text" class="form-input" id="nu-criadero" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="form-section-title">Suscripción</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Vigencia (días)</label>
+          <input type="number" class="form-input" id="nu-days" value="365" min="1">
+        </div>
+      </div>
+      <button class="btn-big secondary" onclick="generatePassword()">🎲 Generar contraseña aleatoria</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EDITAR USUARIO (admin) -->
+<div class="modal-overlay" id="modal-edit-user">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-edit-user')">Cerrar</button>
+      <div class="modal-title">Gestionar usuario</div>
+      <button class="modal-btn primary" onclick="saveUserChanges()">Guardar</button>
+    </div>
+    <div class="modal-body" id="edit-user-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: CAMBIAR CONTRASEÑA -->
+<div class="modal-overlay" id="modal-change-pwd">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-change-pwd')">Cancelar</button>
+      <div class="modal-title">Cambiar contraseña</div>
+      <button class="modal-btn primary" onclick="doChangePassword()">Cambiar</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Nueva contraseña</label>
+          <input type="password" class="form-input" id="cp-new" placeholder="Mínimo 6 caracteres">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Confirmar</label>
+          <input type="password" class="form-input" id="cp-confirm" placeholder="Repetir contraseña">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app-content -->
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -566,38 +796,525 @@ let state = {
   currentBirdId: null,
   editingBirdId: null,
   currentFilter: 'all',
-  confirmCallback: null
+  confirmCallback: null,
+  // Firebase
+  user: null,        // usuario autenticado
+  userProfile: null, // datos del usuario en Firestore
+  isAdmin: false,
+  allUsers: [],      // sólo cargado si es admin
+  editingUserId: null,
+  unsubscribers: []  // listeners de Firestore para limpiar
 };
 
-// =========== STORAGE (localStorage para PWA) ============
-const STORAGE_KEY = 'criadero-data';
+// =========== AUTH / FIREBASE ============
+const ADMIN_EMAIL_KEY = 'criadero-admin-email'; // primer admin se guarda local
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      state.birds = parsed.birds || [];
-      state.zones = parsed.zones || state.zones;
-      state.inventory = parsed.inventory || [];
-      state.pending = parsed.pending || [];
-    }
-  } catch(e) { console.warn('Error cargando:', e); }
+function showFullLoader(show, msg = 'Cargando...') {
+  const el = document.getElementById('full-loader');
+  if (show) {
+    el.querySelector('p').textContent = msg;
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
 }
 
-function saveState() {
+function showSyncStatus(msg) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(window._syncTimeout);
+  window._syncTimeout = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+
+  if (!email || !password) {
+    errEl.textContent = 'Ingresa tu correo y contraseña';
+    errEl.classList.add('show');
+    return;
+  }
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span> Entrando...';
+
   try {
-    const data = {
-      birds: state.birds,
-      zones: state.zones,
-      inventory: state.inventory,
-      pending: state.pending
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    await window.fb.signInWithEmailAndPassword(window.fb.auth, email, password);
+    // El onAuthStateChanged se encargará del resto
+  } catch (e) {
+    let msg = 'Error al iniciar sesión';
+    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') msg = 'Correo o contraseña incorrectos';
+    else if (e.code === 'auth/invalid-email') msg = 'Correo inválido';
+    else if (e.code === 'auth/too-many-requests') msg = 'Demasiados intentos. Espera unos minutos';
+    else if (e.code === 'auth/network-request-failed') msg = 'Sin conexión a internet';
+    errEl.textContent = msg;
+    errEl.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
+}
+
+async function forgotPassword() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) {
+    toast('⚠️ Ingresa tu correo primero arriba');
+    return;
+  }
+  try {
+    await window.fb.sendPasswordResetEmail(window.fb.auth, email);
+    toast('📧 Te enviamos un correo para restablecer');
   } catch(e) {
-    console.error('Error guardando:', e);
-    if (e.name === 'QuotaExceededError') {
-      toast('⚠️ Memoria llena. Usa fotos más pequeñas.');
+    toast('⚠️ No se pudo enviar el correo');
+  }
+}
+
+async function doLogout() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  // Limpiar listeners
+  state.unsubscribers.forEach(unsub => { try { unsub(); } catch(e){} });
+  state.unsubscribers = [];
+  await window.fb.signOut(window.fb.auth);
+}
+
+async function onUserLoggedIn(user) {
+  state.user = user;
+  showFullLoader(true, 'Cargando tu criadero...');
+
+  try {
+    // Obtener perfil del usuario en Firestore
+    const userDocRef = window.fb.doc(window.fb.db, 'users', user.uid);
+    let userSnap = await window.fb.getDoc(userDocRef);
+
+    if (!userSnap.exists()) {
+      // PRIMER LOGIN: crear perfil. Si es el primer usuario en general → admin
+      const usersSnap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
+      const isFirstUser = usersSnap.empty;
+      const profile = {
+        email: user.email,
+        name: user.email.split('@')[0],
+        role: isFirstUser ? 'admin' : 'user',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        expiresAt: isFirstUser ? null : new Date(Date.now() + 365*24*60*60*1000).toISOString()
+      };
+      await window.fb.setDoc(userDocRef, profile);
+      userSnap = await window.fb.getDoc(userDocRef);
+      if (isFirstUser) {
+        setTimeout(() => alert('🎉 ¡Bienvenido!\n\nEres el primer usuario, por lo que se te asignó el rol de ADMINISTRADOR.\n\nDesde "⚙️ Más → Panel de Administrador" podrás crear cuentas para los criadores.'), 500);
+      }
+    }
+
+    state.userProfile = userSnap.data();
+    state.isAdmin = state.userProfile.role === 'admin';
+
+    // Verificar estado de cuenta
+    if (state.userProfile.status === 'suspended') {
+      showFullLoader(false);
+      document.getElementById('login-error').textContent = '🚫 Tu cuenta está suspendida. Contacta al administrador.';
+      document.getElementById('login-error').classList.add('show');
+      await window.fb.signOut(window.fb.auth);
+      return;
+    }
+    if (state.userProfile.expiresAt && !state.isAdmin) {
+      const expDate = new Date(state.userProfile.expiresAt);
+      if (expDate < new Date()) {
+        showFullLoader(false);
+        document.getElementById('login-error').textContent = '⏰ Tu suscripción ha vencido. Contacta al administrador.';
+        document.getElementById('login-error').classList.add('show');
+        await window.fb.signOut(window.fb.auth);
+        return;
+      }
+    }
+
+    // Cargar datos del criadero del usuario
+    await loadUserData();
+
+    // Mostrar la app
+    document.getElementById('login-screen').classList.remove('active');
+    document.getElementById('app-content').classList.add('active');
+
+    // Mostrar botón admin si corresponde
+    document.getElementById('admin-panel-btn').style.display = state.isAdmin ? 'block' : 'none';
+
+    // Llenar info de usuario en pantalla "Más"
+    updateUserInfoUI();
+
+    renderBirds();
+    showFullLoader(false);
+
+    // Si es admin, ir cargando lista de usuarios en background
+    if (state.isAdmin) loadAllUsers();
+
+  } catch(e) {
+    console.error('Error cargando usuario:', e);
+    showFullLoader(false);
+    alert('Error al cargar datos: ' + e.message);
+  }
+}
+
+function updateUserInfoUI() {
+  document.getElementById('more-user-name').textContent = state.userProfile.name || state.user.email;
+  document.getElementById('more-user-email').textContent = state.user.email;
+  let meta = state.isAdmin ? '👑 Administrador' : '👤 Criador';
+  if (state.userProfile.expiresAt) {
+    const d = new Date(state.userProfile.expiresAt);
+    meta += ` · Vence: ${d.toLocaleDateString()}`;
+  }
+  document.getElementById('more-user-meta').textContent = meta;
+}
+
+function onUserLoggedOut() {
+  state.user = null;
+  state.userProfile = null;
+  state.isAdmin = false;
+  state.birds = [];
+  state.zones = [{id:'z1',name:'Zona A'},{id:'z2',name:'Zona B'},{id:'z3',name:'Zona C'},{id:'z4',name:'Zona D'}];
+  state.inventory = [];
+  state.pending = [];
+  state.allUsers = [];
+  document.getElementById('app-content').classList.remove('active');
+  document.getElementById('login-screen').classList.add('active');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-btn').textContent = 'Entrar';
+  document.getElementById('login-error').classList.remove('show');
+  showFullLoader(false);
+}
+
+// Esperar a que Firebase esté listo y configurar listener de auth
+function initAuth() {
+  window.fb.onAuthStateChanged(window.fb.auth, (user) => {
+    if (user) {
+      onUserLoggedIn(user);
+    } else {
+      onUserLoggedOut();
+    }
+  });
+}
+
+// =========== STORAGE EN FIREBASE ============
+async function loadUserData() {
+  const uid = state.user.uid;
+  // Datos privados del usuario: users/{uid}/data/main
+  const dataRef = window.fb.doc(window.fb.db, 'users', uid, 'data', 'main');
+  const snap = await window.fb.getDoc(dataRef);
+  if (snap.exists()) {
+    const d = snap.data();
+    state.birds = d.birds || [];
+    state.zones = d.zones || state.zones;
+    state.inventory = d.inventory || [];
+    state.pending = d.pending || [];
+  }
+}
+
+let _saveTimeout = null;
+function saveState() {
+  // Debounce: agrupar varios saves seguidos en una sola escritura a Firestore
+  clearTimeout(_saveTimeout);
+  _saveTimeout = setTimeout(async () => {
+    if (!state.user) return;
+    try {
+      showSyncStatus('☁️ Sincronizando...');
+      const dataRef = window.fb.doc(window.fb.db, 'users', state.user.uid, 'data', 'main');
+      await window.fb.setDoc(dataRef, {
+        birds: state.birds,
+        zones: state.zones,
+        inventory: state.inventory,
+        pending: state.pending,
+        updatedAt: new Date().toISOString()
+      });
+      showSyncStatus('✓ Guardado');
+    } catch(e) {
+      console.error('Save error:', e);
+      showSyncStatus('⚠️ Error al sincronizar');
+    }
+  }, 800);
+}
+
+// Compatibilidad: la función loadState ya no se usa, pero algunos llamados antiguos podrían referenciarla
+function loadState() {}
+
+// =========== ADMIN: GESTIÓN DE USUARIOS ============
+async function loadAllUsers() {
+  try {
+    const usersSnap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users'));
+    state.allUsers = [];
+    usersSnap.forEach(d => {
+      state.allUsers.push({ id: d.id, ...d.data() });
+    });
+    renderAdminUsers();
+  } catch(e) {
+    console.error('Error cargando usuarios:', e);
+  }
+}
+
+function renderAdminUsers() {
+  const list = document.getElementById('admin-users-list');
+  const total = state.allUsers.length;
+  const active = state.allUsers.filter(u => u.status === 'active' && (!u.expiresAt || new Date(u.expiresAt) > new Date())).length;
+  const suspended = state.allUsers.filter(u => u.status === 'suspended').length;
+  document.getElementById('admin-total-users').textContent = total;
+  document.getElementById('admin-active-users').textContent = active;
+  document.getElementById('admin-suspended-users').textContent = suspended;
+
+  if (total === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="big-icon">👥</div><h2>Sin usuarios todavía</h2><p>Toca "+ Crear nuevo usuario" arriba</p></div>';
+    return;
+  }
+
+  list.innerHTML = state.allUsers.slice().sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(u => {
+    const initial = (u.name || u.email || '?').charAt(0).toUpperCase();
+    let statusText = '<span class="user-status-active">● Activo</span>';
+    if (u.status === 'suspended') statusText = '<span class="user-status-suspended">● Suspendido</span>';
+    else if (u.expiresAt && new Date(u.expiresAt) < new Date()) statusText = '<span class="user-status-expired">● Vencido</span>';
+    const roleText = u.role === 'admin' ? '<span class="admin-badge">ADMIN</span>' : '';
+    const expText = u.expiresAt ? `Vence: ${new Date(u.expiresAt).toLocaleDateString()}` : 'Sin vencimiento';
+    return `<div class="user-row" onclick="openEditUser('${u.id}')">
+      <div class="user-avatar">${initial}</div>
+      <div class="user-row-info">
+        <div class="user-row-name">${u.name || 'Sin nombre'}${roleText}</div>
+        <div class="user-row-email">${u.email}</div>
+        <div class="user-row-meta">${statusText} · ${expText}</div>
+      </div>
+      <div class="bird-chevron">›</div>
+    </div>`;
+  }).join('');
+}
+
+function openNewUserForm() {
+  document.getElementById('nu-name').value = '';
+  document.getElementById('nu-email').value = '';
+  document.getElementById('nu-password').value = '';
+  document.getElementById('nu-phone').value = '';
+  document.getElementById('nu-criadero').value = '';
+  document.getElementById('nu-days').value = '365';
+  openModal('modal-new-user');
+}
+
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pwd = '';
+  for (let i = 0; i < 10; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  document.getElementById('nu-password').value = pwd;
+}
+
+async function saveNewUser() {
+  const name = document.getElementById('nu-name').value.trim();
+  const email = document.getElementById('nu-email').value.trim().toLowerCase();
+  const password = document.getElementById('nu-password').value;
+  const phone = document.getElementById('nu-phone').value.trim();
+  const criadero = document.getElementById('nu-criadero').value.trim();
+  const days = parseInt(document.getElementById('nu-days').value) || 365;
+
+  if (!name) { toast('⚠️ Falta el nombre'); return; }
+  if (!email || !email.includes('@')) { toast('⚠️ Correo inválido'); return; }
+  if (!password || password.length < 6) { toast('⚠️ La contraseña debe tener al menos 6 caracteres'); return; }
+
+  const btn = document.getElementById('save-user-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    // PROBLEMA: createUserWithEmailAndPassword desloguea al admin actual.
+    // Solución: usamos una segunda instancia de Auth temporal.
+    // (Para Spark/proyectos pequeños esto es lo más simple)
+    const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const { getAuth: getAuth2, createUserWithEmailAndPassword: createUser2, signOut: signOut2 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+
+    const tempApp = initializeApp({
+      apiKey: "AIzaSyCe2FwuonnghNu5H9As65O-dtudnVFeWXI",
+      authDomain: "mi-criadero-ea258.firebaseapp.com",
+      projectId: "mi-criadero-ea258",
+      storageBucket: "mi-criadero-ea258.firebasestorage.app",
+      messagingSenderId: "1084308767268",
+      appId: "1:1084308767268:web:95f10a6f4ff783ec5f4eb1"
+    }, 'temp-' + Date.now());
+    const tempAuth = getAuth2(tempApp);
+
+    const cred = await createUser2(tempAuth, email, password);
+    const newUid = cred.user.uid;
+
+    // Crear perfil en Firestore
+    await window.fb.setDoc(window.fb.doc(window.fb.db, 'users', newUid), {
+      email: email,
+      name: name,
+      phone: phone,
+      criadero: criadero,
+      role: 'user',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + days*24*60*60*1000).toISOString(),
+      createdBy: state.user.uid
+    });
+
+    await signOut2(tempAuth);
+    await deleteApp(tempApp);
+
+    closeModal('modal-new-user');
+    await loadAllUsers();
+
+    // Mostrar credenciales para que el admin las copie
+    const credentialsText = `📋 CREDENCIALES DEL NUEVO USUARIO\n\n👤 Nombre: ${name}\n📧 Correo: ${email}\n🔑 Contraseña: ${password}\n⏰ Vigencia: ${days} días\n\n⚠️ Copia estos datos AHORA. La contraseña no se podrá ver de nuevo.\n\nURL de la app: ${window.location.origin}${window.location.pathname}`;
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(credentialsText);
+        alert(credentialsText + '\n\n✅ Datos copiados al portapapeles');
+      } catch(e) {
+        alert(credentialsText);
+      }
+    } else {
+      alert(credentialsText);
+    }
+    toast('✅ Usuario creado');
+  } catch(e) {
+    console.error(e);
+    let msg = 'Error al crear usuario';
+    if (e.code === 'auth/email-already-in-use') msg = '⚠️ Este correo ya está registrado';
+    else if (e.code === 'auth/invalid-email') msg = '⚠️ Correo inválido';
+    else if (e.code === 'auth/weak-password') msg = '⚠️ Contraseña muy débil';
+    toast(msg);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Crear';
+  }
+}
+
+function openEditUser(uid) {
+  const u = state.allUsers.find(x => x.id === uid);
+  if (!u) return;
+  state.editingUserId = uid;
+  const isMe = uid === state.user.uid;
+  const expDate = u.expiresAt ? new Date(u.expiresAt).toISOString().split('T')[0] : '';
+
+  document.getElementById('edit-user-body').innerHTML = `
+    <div class="form-section" style="padding: 14px; margin-bottom: 12px; text-align: center;">
+      <div class="user-avatar" style="margin: 0 auto 10px; width: 60px; height: 60px; font-size: 26px;">${(u.name||u.email).charAt(0).toUpperCase()}</div>
+      <div style="font-size: 17px; font-weight: 600;">${u.name || 'Sin nombre'}</div>
+      <div style="font-size: 13px; color: #8e8e93;">${u.email}</div>
+    </div>
+    <div class="form-section-title">Datos</div>
+    <div class="form-section">
+      <div class="form-row">
+        <label class="form-label">Nombre</label>
+        <input type="text" class="form-input" id="eu-name" value="${u.name||''}">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Teléfono</label>
+        <input type="text" class="form-input" id="eu-phone" value="${u.phone||''}">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Criadero</label>
+        <input type="text" class="form-input" id="eu-criadero" value="${u.criadero||''}">
+      </div>
+    </div>
+    <div class="form-section-title">Estado de cuenta</div>
+    <div class="form-section">
+      <div class="form-row">
+        <label class="form-label">Estado</label>
+        <select class="form-select" id="eu-status" ${isMe?'disabled':''}>
+          <option value="active" ${u.status==='active'?'selected':''}>Activo</option>
+          <option value="suspended" ${u.status==='suspended'?'selected':''}>Suspendido</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Rol</label>
+        <select class="form-select" id="eu-role" ${isMe?'disabled':''}>
+          <option value="user" ${u.role==='user'?'selected':''}>Criador</option>
+          <option value="admin" ${u.role==='admin'?'selected':''}>Administrador</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Vence el</label>
+        <input type="date" class="form-input" id="eu-expires" value="${expDate}">
+      </div>
+    </div>
+    <button class="btn-big secondary" onclick="extendSubscription(365)">+ Renovar 1 año</button>
+    <button class="btn-big secondary" onclick="extendSubscription(30)">+ Extender 30 días</button>
+    ${!isMe ? `<button class="btn-big danger" onclick="deleteUserProfile()" style="margin-top: 14px;">🗑️ Eliminar usuario</button>` : '<div class="help-text" style="text-align:center; margin-top:14px;">No puedes modificar tu propio rol o estado</div>'}
+  `;
+  openModal('modal-edit-user');
+}
+
+function extendSubscription(days) {
+  const u = state.allUsers.find(x => x.id === state.editingUserId);
+  if (!u) return;
+  const current = u.expiresAt ? new Date(u.expiresAt) : new Date();
+  const newDate = current < new Date() ? new Date() : current;
+  newDate.setDate(newDate.getDate() + days);
+  document.getElementById('eu-expires').value = newDate.toISOString().split('T')[0];
+  toast(`+${days} días añadidos. Guarda para confirmar.`);
+}
+
+async function saveUserChanges() {
+  if (!state.editingUserId) return;
+  const updates = {
+    name: document.getElementById('eu-name').value.trim(),
+    phone: document.getElementById('eu-phone').value.trim(),
+    criadero: document.getElementById('eu-criadero').value.trim()
+  };
+  const isMe = state.editingUserId === state.user.uid;
+  if (!isMe) {
+    updates.status = document.getElementById('eu-status').value;
+    updates.role = document.getElementById('eu-role').value;
+  }
+  const exp = document.getElementById('eu-expires').value;
+  updates.expiresAt = exp ? new Date(exp).toISOString() : null;
+
+  try {
+    await window.fb.updateDoc(window.fb.doc(window.fb.db, 'users', state.editingUserId), updates);
+    closeModal('modal-edit-user');
+    await loadAllUsers();
+    toast('✅ Cambios guardados');
+  } catch(e) {
+    toast('⚠️ Error al guardar');
+    console.error(e);
+  }
+}
+
+async function deleteUserProfile() {
+  if (!confirm('¿Eliminar este usuario?\n\nSus datos del criadero también se eliminarán.\nNOTA: La cuenta de acceso quedará en Firebase Auth pero sin perfil podrá no entrar a la app.')) return;
+  try {
+    // Borrar datos del criadero
+    try { await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'users', state.editingUserId, 'data', 'main')); } catch(e){}
+    // Borrar perfil
+    await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'users', state.editingUserId));
+    closeModal('modal-edit-user');
+    await loadAllUsers();
+    toast('🗑️ Usuario eliminado');
+  } catch(e) {
+    toast('⚠️ Error');
+    console.error(e);
+  }
+}
+
+function changePassword() {
+  document.getElementById('cp-new').value = '';
+  document.getElementById('cp-confirm').value = '';
+  openModal('modal-change-pwd');
+}
+
+async function doChangePassword() {
+  const newp = document.getElementById('cp-new').value;
+  const conf = document.getElementById('cp-confirm').value;
+  if (newp.length < 6) { toast('⚠️ Mínimo 6 caracteres'); return; }
+  if (newp !== conf) { toast('⚠️ No coinciden'); return; }
+  try {
+    const { updatePassword } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+    await updatePassword(state.user, newp);
+    closeModal('modal-change-pwd');
+    toast('✅ Contraseña cambiada');
+  } catch(e) {
+    if (e.code === 'auth/requires-recent-login') {
+      toast('⚠️ Vuelve a iniciar sesión y reintenta');
+      setTimeout(() => doLogout(), 1500);
+    } else {
+      toast('⚠️ Error: ' + e.message);
     }
   }
 }
@@ -613,12 +1330,15 @@ function toast(msg) {
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  document.querySelector(`.nav-btn[data-page="${name}"]`).classList.add('active');
+  const pageEl = document.getElementById('page-' + name);
+  if (pageEl) pageEl.classList.add('active');
+  const navBtn = document.querySelector(`.nav-btn[data-page="${name}"]`);
+  if (navBtn) navBtn.classList.add('active');
   if (name === 'tree') populateTreeSelect();
   if (name === 'zones') renderZones();
   if (name === 'inventory') renderInventory();
   if (name === 'pending') renderPending();
+  if (name === 'admin') { loadAllUsers(); }
   window.scrollTo(0,0);
 }
 function setFilter(f) {
@@ -1346,8 +2066,19 @@ function confirmClearAll() {
 }
 
 // =========== INICIO ============
-loadState();
-renderBirds();
+// Esperar a que Firebase SDK se inicialice
+if (window.fb) {
+  initAuth();
+} else {
+  window.addEventListener('firebase-ready', initAuth);
+}
+
+// Permitir entrar con Enter en el login
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && document.getElementById('login-screen').classList.contains('active')) {
+    doLogin();
+  }
+});
 
 // =========== SERVICE WORKER (PWA offline) ============
 if ('serviceWorker' in navigator) {
