@@ -1,7 +1,7 @@
 // Mi Criadero - Service Worker
 // Permite que la app funcione sin internet una vez instalada
 
-const CACHE_NAME = 'mi-criadero-v2';
+const CACHE_NAME = 'mi-criadero-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -46,19 +46,28 @@ self.addEventListener('activate', (event) => {
 });
 
 // Al hacer petición: servir desde cache, si no, ir a la red
+// Cachea también librerías externas (Firebase, SheetJS) para que la app
+// pueda abrir y funcionar sin internet después del primer uso.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = event.request.url;
+  // No cachear llamadas a la base de datos / autenticación (deben ir en vivo o las maneja Firestore offline)
+  if (url.includes('firestore.googleapis.com') ||
+      url.includes('identitytoolkit.googleapis.com') ||
+      url.includes('googleapis.com/google.firestore') ||
+      url.includes('/google.firestore.')) {
+    return; // dejar que Firebase lo maneje (tiene su propia persistencia offline)
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return cached || fetch(event.request).then((response) => {
-        // Cachear la nueva respuesta para futuro uso offline
-        if (response && response.status === 200 && response.type === 'basic') {
+        // Cachear recursos propios y de CDN (scripts, estilos, fuentes)
+        if (response && (response.status === 200 || response.type === 'opaque')) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
       }).catch(() => {
-        // Si no hay red y no está en cache, retornar el index
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
