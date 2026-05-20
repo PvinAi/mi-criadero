@@ -269,6 +269,20 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
 .sync-status.show { opacity: 1; }
 .offline-banner { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 8px 16px; background: #ff9500; color: #fff; border-radius: 20px; font-size: 12px; font-weight: 500; z-index: 1002; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 90%; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .offline-banner.show { opacity: 1; }
+/* Mercado */
+.market-card { background:#fff; border-radius:14px; overflow:hidden; border:0.5px solid #e5e5ea; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+.market-card-top { display:flex; }
+.market-photo { width:120px; height:120px; flex-shrink:0; background:#f2f2f7; display:flex; align-items:center; justify-content:center; font-size:44px; overflow:hidden; }
+.market-info { padding:12px 14px; flex:1; min-width:0; }
+.market-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px; }
+.market-placa { font-size:17px; font-weight:700; color:#1c1c1e; }
+.market-meta { font-size:13px; color:#6b7280; line-height:1.7; }
+.market-criadero { color:#C0392B; font-weight:600; }
+.market-card-bottom { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-top:0.5px solid #f0f0f3; }
+.market-precio { font-size:24px; font-weight:800; color:#1c1c1e; }
+.market-btn-wa { background:#25D366; color:#fff; font-size:15px; font-weight:600; padding:10px 22px; border:none; border-radius:10px; cursor:pointer; }
+.market-btn-wa:active { background:#1da851; }
+.market-btn-own { background:#f2f2f7; color:#007aff; font-size:14px; font-weight:600; padding:10px 18px; border:none; border-radius:10px; cursor:pointer; }
 
 /* User chip en header */
 .user-chip { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #f2f2f7; border-radius: 16px; font-size: 12px; color: #1c1c1e; cursor: pointer; }
@@ -350,11 +364,13 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
     <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todas</div>
     <div class="filter-chip" data-filter="Gallo" onclick="setFilter('Gallo')">Gallos</div>
     <div class="filter-chip" data-filter="Gallina" onclick="setFilter('Gallina')">Gallinas</div>
+    <div class="filter-chip" data-filter="Pollo" onclick="setFilter('Pollo')">Pollos</div>
     <div class="filter-chip" data-filter="crown1" onclick="setFilter('crown1')">👑 Campeones</div>
     <div class="filter-chip" data-filter="crown2" onclick="setFilter('crown2')">👑👑 2+</div>
     <div class="filter-chip" data-filter="crown3" onclick="setFilter('crown3')">👑👑👑 3</div>
     <div class="filter-chip" data-filter="diamond" onclick="setFilter('diamond')">💎 Madres</div>
     <div class="filter-chip" data-filter="sick" onclick="setFilter('sick')">🚑 Enfermos</div>
+    <div class="filter-chip" data-filter="venta" onclick="setFilter('venta')">En venta</div>
     <div class="filter-chip" data-filter="vivo" onclick="setFilter('vivo')">Vivos</div>
     <div class="filter-chip" data-filter="muerto" onclick="setFilter('muerto')">Muertos</div>
     <div class="filter-chip" data-filter="vendido" onclick="setFilter('vendido')">Vendidos</div>
@@ -420,6 +436,23 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   </div>
 </div>
 
+<!-- PÁGINA: MERCADO -->
+<div class="page" id="page-market">
+  <div class="page-header">
+    <h2>🛒 Mercado</h2>
+    <p>Aves en venta de toda la comunidad</p>
+  </div>
+  <div class="filter-bar" id="market-filter-bar">
+    <div class="filter-chip active" data-filter="all" onclick="setMarketFilter('all')">Todos</div>
+    <div class="filter-chip" data-filter="Gallo" onclick="setMarketFilter('Gallo')">Gallos</div>
+    <div class="filter-chip" data-filter="Gallina" onclick="setMarketFilter('Gallina')">Gallinas</div>
+    <div class="filter-chip" data-filter="Pollo" onclick="setMarketFilter('Pollo')">Pollos</div>
+  </div>
+  <div class="page-content">
+    <div id="market-list"></div>
+  </div>
+</div>
+
 <!-- PÁGINA: MÁS -->
 <div class="page" id="page-more">
   <div class="page-header">
@@ -435,6 +468,7 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
 
     <button class="btn-big secondary" id="admin-panel-btn" onclick="showPage('admin')" style="display:none;">👑 Panel de Administrador</button>
     <button class="btn-big secondary" id="team-btn" onclick="showPage('team')" style="display:none;">👥 Mi Equipo (sub-usuarios)</button>
+    <button class="btn-big secondary" id="profile-btn" onclick="openProfileForm()">🏠 Mi perfil de criadero</button>
     <button class="btn-big secondary" onclick="changePassword()">🔑 Cambiar mi contraseña</button>
     <button class="btn-big secondary" onclick="exportExcel()">📥 Descargar plantilla Excel</button>
     <button class="btn-big secondary" onclick="exportData()">📤 Exportar mis datos (Excel)</button>
@@ -504,6 +538,9 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   <button class="nav-btn" data-page="pending" onclick="showPage('pending')">
     <span class="icon">⚠️</span><span>Alertas</span>
   </button>
+  <button class="nav-btn" data-page="market" onclick="showPage('market')">
+    <span class="icon">🛒</span><span>Mercado</span>
+  </button>
   <button class="nav-btn" data-page="more" onclick="showPage('more')">
     <span class="icon">⚙️</span><span>Más</span>
   </button>
@@ -546,6 +583,7 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
           <select class="form-select" id="f-genero">
             <option value="Gallo">Gallo</option>
             <option value="Gallina">Gallina</option>
+            <option value="Pollo">Pollo</option>
           </select>
         </div>
         <div class="form-row">
@@ -606,11 +644,23 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
         </div>
         <div class="form-row">
           <label class="form-label">Vital</label>
-          <select class="form-select" id="f-vital">
+          <select class="form-select" id="f-vital" onchange="onVitalChange()">
             <option value="vivo">Vivo</option>
             <option value="muerto">Muerto</option>
+            <option value="venta">En venta</option>
             <option value="vendido">Vendido</option>
           </select>
+        </div>
+      </div>
+
+      <div class="form-section-title" id="venta-section-title" style="display:none;">Datos de venta (Mercado)</div>
+      <div class="form-section" id="venta-section" style="display:none;">
+        <div class="help-text" style="padding:8px 16px; color:#8e8e93; font-size:13px;">
+          Esta ave aparecerá en el Mercado público. Otros criadores podrán verla y contactarte por WhatsApp.
+        </div>
+        <div class="form-row">
+          <label class="form-label">Precio (USD) *</label>
+          <input type="number" step="1" min="0" class="form-input" id="f-precio" placeholder="Ej: 250">
         </div>
       </div>
 
@@ -810,6 +860,35 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   </div>
 </div>
 
+<!-- MODAL: MI PERFIL DE CRIADERO -->
+<div class="modal-overlay" id="modal-profile">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-profile')">Cancelar</button>
+      <div class="modal-title">Mi perfil de criadero</div>
+      <button class="modal-btn primary" onclick="saveProfile()">Guardar</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-text" style="padding:10px 16px; color:#8e8e93; font-size:13px;">
+        Estos datos se usan para publicar tus aves en el Mercado. El WhatsApp es necesario para que los compradores te contacten.
+      </div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Nombre de tu criadero</label>
+          <input type="text" class="form-input" id="pf-criadero" placeholder="Ej: VINTIMILLA">
+        </div>
+        <div class="form-row">
+          <label class="form-label">WhatsApp (con código de país)</label>
+          <input type="tel" class="form-input" id="pf-phone" placeholder="Ej: 0991234567">
+        </div>
+      </div>
+      <div class="help-text" style="padding:10px 16px; color:#8e8e93; font-size:12px;">
+        Ejemplo Ecuador: 0991234567 (se convierte automáticamente a formato internacional).
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: CAMBIAR CONTRASEÑA -->
 <div class="modal-overlay" id="modal-change-pwd">
   <div class="modal">
@@ -907,7 +986,11 @@ let state = {
   // Sub-usuarios / permisos
   perms: null,        // permisos del usuario actual si es sub-usuario (null = dueño con todo)
   dataOwnerId: null,  // de quién son los datos que estoy viendo (mi padre si soy sub-usuario)
-  myTeam: []          // sub-usuarios que YO creé
+  myTeam: [],         // sub-usuarios que YO creé
+  ownerProfile: null, // perfil del dueño de los datos (mi padre si soy sub-usuario, o yo mismo)
+  // Mercado
+  market: [],
+  marketFilter: 'all'
 };
 
 // =========== AUTH / FIREBASE ============
@@ -1045,6 +1128,7 @@ async function onUserLoggedIn(user) {
         const parentSnap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', state.dataOwnerId));
         if (parentSnap.exists()) {
           const p = parentSnap.data();
+          state.ownerProfile = p;  // perfil del dueño (para teléfono/criadero del mercado)
           if (p.status === 'suspended' || (p.expiresAt && new Date(p.expiresAt) < new Date())) {
             showFullLoader(false);
             document.getElementById('login-error').textContent = '⏰ El criadero al que perteneces no está activo. Contacta a tu administrador.';
@@ -1056,6 +1140,7 @@ async function onUserLoggedIn(user) {
       } catch(e) { /* continuar */ }
     } else {
       state.perms = null;  // dueño = todos los permisos
+      state.ownerProfile = state.userProfile;  // mi propio perfil
       state.dataOwnerId = user.uid;
     }
 
@@ -1104,6 +1189,10 @@ function applyPermissions() {
   if (navInventory) navInventory.style.display = can('inventory') ? 'flex' : 'none';
   const navTree = document.querySelector('.nav-btn[data-page="tree"]');
   if (navTree) navTree.style.display = can('tree') ? 'flex' : 'none';
+
+  // Botón "Mi perfil de criadero": solo el dueño (no sub-usuarios)
+  const profileBtn = document.getElementById('profile-btn');
+  if (profileBtn) profileBtn.style.display = (state.userProfile && state.userProfile.parentId) ? 'none' : 'block';
 
   // Si está en una página sin permiso, volver a aves
   // (los sub-usuarios siempre pueden ver aves por defecto)
@@ -1479,6 +1568,38 @@ async function deleteUserProfile() {
   }
 }
 
+// =========== MI PERFIL DE CRIADERO ============
+function openProfileForm() {
+  // Sub-usuarios no editan el perfil del criadero (es del dueño)
+  if (state.userProfile && state.userProfile.parentId) {
+    toast('Solo el dueño del criadero puede editar este perfil');
+    return;
+  }
+  document.getElementById('pf-criadero').value = state.userProfile.criadero || '';
+  document.getElementById('pf-phone').value = state.userProfile.phone || '';
+  openModal('modal-profile');
+}
+
+async function saveProfile() {
+  const criadero = document.getElementById('pf-criadero').value.trim();
+  const phone = document.getElementById('pf-phone').value.trim();
+  try {
+    await window.fb.updateDoc(
+      window.fb.doc(window.fb.db, 'users', state.user.uid),
+      { criadero: criadero, phone: phone }
+    );
+    state.userProfile.criadero = criadero;
+    state.userProfile.phone = phone;
+    state.ownerProfile = state.userProfile;
+    closeModal('modal-profile');
+    toast('✅ Perfil actualizado');
+    updateUserInfoUI();
+  } catch(e) {
+    console.error(e);
+    toast('⚠️ Error al guardar el perfil');
+  }
+}
+
 function changePassword() {
   document.getElementById('cp-new').value = '';
   document.getElementById('cp-confirm').value = '';
@@ -1702,6 +1823,136 @@ async function deleteSubuser() {
   }
 }
 
+// =========== MERCADO PÚBLICO ============
+// El ID de la ficha en el mercado = ownerId_birdId (único por ave)
+function marketDocId(birdId) {
+  const ownerId = state.dataOwnerId || state.user.uid;
+  return ownerId + '_' + birdId;
+}
+
+// Publica, actualiza o elimina la ficha del mercado según el estado del ave
+async function syncMarketListing(bird) {
+  if (!state.user) return;
+  const ownerId = state.dataOwnerId || state.user.uid;
+  const docId = marketDocId(bird.id);
+  const ref = window.fb.doc(window.fb.db, 'mercado', docId);
+  try {
+    if (bird.vital === 'venta') {
+      // Publicar / actualizar ficha pública
+      await window.fb.setDoc(ref, {
+        ownerId: ownerId,
+        birdId: bird.id,
+        placa: bird.placa || '',
+        genero: bird.genero || '',
+        color: bird.color || '',
+        linea: bird.linea || '',
+        nacimiento: bird.nacimiento || '',
+        precio: bird.precio || 0,
+        foto: bird.foto || '',
+        criadero: getOwnerCriadero(),
+        phone: getOwnerPhone(),
+        publishedAt: new Date().toISOString()
+      });
+    } else {
+      // Si ya no está en venta, quitar del mercado (si existía)
+      try { await window.fb.deleteDoc(ref); } catch(e) { /* no existía */ }
+    }
+  } catch(e) {
+    console.error('Error sincronizando mercado:', e);
+  }
+}
+
+// Al eliminar un ave, quitar su ficha del mercado
+async function removeFromMarket(birdId) {
+  if (!state.user) return;
+  try {
+    await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'mercado', marketDocId(birdId)));
+  } catch(e) { /* no existía */ }
+}
+
+async function loadMarket() {
+  const list = document.getElementById('market-list');
+  list.innerHTML = '<div class="empty-state"><div class="big-icon">🛒</div><p>Cargando mercado...</p></div>';
+  try {
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'mercado'));
+    state.market = [];
+    snap.forEach(d => state.market.push({ id: d.id, ...d.data() }));
+    // Más recientes primero
+    state.market.sort((a,b) => (b.publishedAt||'').localeCompare(a.publishedAt||''));
+    renderMarket();
+  } catch(e) {
+    console.error('Error cargando mercado:', e);
+    list.innerHTML = '<div class="empty-state"><div class="big-icon">⚠️</div><h2>No se pudo cargar</h2><p>Revisa tu conexión a internet</p></div>';
+  }
+}
+
+function renderMarket() {
+  const list = document.getElementById('market-list');
+  const myOwnerId = state.dataOwnerId || state.user.uid;
+  let items = state.market;
+
+  // Filtro por tipo
+  const f = state.marketFilter || 'all';
+  if (f !== 'all') items = items.filter(m => m.genero === f);
+
+  if (items.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="big-icon">🛒</div><h2>Mercado vacío</h2><p>Aún no hay aves en venta en esta categoría</p></div>';
+    return;
+  }
+
+  list.innerHTML = items.map(m => {
+    const esMia = m.ownerId === myOwnerId;
+    const fotoHtml = m.foto
+      ? `<img src="${m.foto}" style="width:100%; height:100%; object-fit:cover;">`
+      : (m.genero === 'Gallo' ? '🐓' : m.genero === 'Gallina' ? '🐔' : '🐤');
+    const edad = calcEdad(m.nacimiento) || 'Sin dato';
+    const miaBadge = esMia ? '<div style="background:#007aff; color:#fff; font-size:11px; padding:2px 8px; border-radius:6px;">TUYA</div>'
+                           : '<div style="background:#27AE60; color:#fff; font-size:11px; padding:2px 8px; border-radius:6px;">EN VENTA</div>';
+    const btnContacto = esMia
+      ? `<button class="market-btn-own" onclick="showPage('birds')">Ver en mis aves</button>`
+      : `<button class="market-btn-wa" onclick="contactSeller('${m.phone}','${m.placa}','${(m.criadero||'').replace(/'/g,"")}')">Contactar</button>`;
+    return `<div class="market-card">
+      <div class="market-card-top">
+        <div class="market-photo">${fotoHtml}</div>
+        <div class="market-info">
+          <div class="market-card-head">
+            <div class="market-placa">Placa ${m.placa}</div>
+            ${miaBadge}
+          </div>
+          <div class="market-meta">
+            <div>${m.genero} · Edad: ${edad}</div>
+            <div>Color: ${m.color || '—'}${m.linea ? ' · Línea: ' + m.linea : ''}</div>
+            <div class="market-criadero">Criadero ${m.criadero || '—'}</div>
+          </div>
+        </div>
+      </div>
+      <div class="market-card-bottom">
+        <div class="market-precio">$${m.precio}</div>
+        ${btnContacto}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setMarketFilter(f) {
+  state.marketFilter = f;
+  document.querySelectorAll('#market-filter-bar .filter-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.filter === f);
+  });
+  renderMarket();
+}
+
+// Abre WhatsApp con el vendedor
+function contactSeller(phone, placa, criadero) {
+  if (!phone) { toast('⚠️ Este vendedor no tiene WhatsApp registrado'); return; }
+  // Limpiar el número (solo dígitos)
+  let num = phone.replace(/[^0-9]/g, '');
+  // Si no tiene código de país y empieza con 0, asumir Ecuador (+593)
+  if (num.startsWith('0')) num = '593' + num.substring(1);
+  const msg = encodeURIComponent(`Hola, vi tu ave Placa ${placa} del criadero ${criadero} en Mi Criadero. ¿Sigue disponible?`);
+  window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
+}
+
 // =========== UTILIDADES ============
 function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
 function toast(msg) {
@@ -1723,6 +1974,7 @@ function showPage(name) {
   if (name === 'pending') renderPending();
   if (name === 'admin') { loadAllUsers(); }
   if (name === 'team') { loadMyTeam(); }
+  if (name === 'market') { loadMarket(); }
   window.scrollTo(0,0);
 }
 function setFilter(f) {
@@ -1788,6 +2040,8 @@ function openBirdForm(birdId = null) {
     document.getElementById('f-estado').value = b.estado || 'En cuido';
     document.getElementById('f-zona').value = b.zona || '';
     document.getElementById('f-vital').value = b.vital || 'vivo';
+    document.getElementById('f-precio').value = b.precio || '';
+    onVitalChange();
     document.getElementById('f-vitaminas').value = b.vitaminas || '';
     document.getElementById('f-problema').value = '';
     document.getElementById('f-notas').value = b.notas || '';
@@ -1810,6 +2064,8 @@ function openBirdForm(birdId = null) {
     document.getElementById('f-estado').value = 'En cuido';
     document.getElementById('f-zona').value = '';
     document.getElementById('f-vital').value = 'vivo';
+    document.getElementById('f-precio').value = '';
+    onVitalChange();
     resetPhotoUI();
   }
   openModal('modal-bird');
@@ -1824,6 +2080,13 @@ function onColorChange() {
     row.style.display = 'none';
     document.getElementById('f-color-otro').value = '';
   }
+}
+
+function onVitalChange() {
+  const val = document.getElementById('f-vital').value;
+  const show = (val === 'venta');
+  document.getElementById('venta-section').style.display = show ? 'block' : 'none';
+  document.getElementById('venta-section-title').style.display = show ? 'block' : 'none';
 }
 
 function choosePhotoSource() {
@@ -1877,6 +2140,23 @@ async function saveBird() {
     colorVal = otro || 'Otro';
   }
 
+  const vital = document.getElementById('f-vital').value;
+  const precio = document.getElementById('f-precio').value.trim();
+
+  // Validaciones para publicar en venta
+  if (vital === 'venta') {
+    if (!precio || Number(precio) <= 0) {
+      toast('⚠️ Para poner en venta, ingresa un precio válido');
+      return;
+    }
+    // Verificar que el dueño tenga WhatsApp en su perfil
+    const phone = getOwnerPhone();
+    if (!phone) {
+      toast('⚠️ Agrega tu número de WhatsApp en "Más" antes de vender');
+      return;
+    }
+  }
+
   const data = {
     placa: placa,
     nombre: document.getElementById('f-nombre').value.trim(),
@@ -1890,7 +2170,8 @@ async function saveBird() {
     origen: document.getElementById('f-origen').value.trim(),
     estado: document.getElementById('f-estado').value,
     zona: document.getElementById('f-zona').value,
-    vital: document.getElementById('f-vital').value,
+    vital: vital,
+    precio: vital === 'venta' ? Number(precio) : '',
     vitaminas: document.getElementById('f-vitaminas').value.trim(),
     notas: document.getElementById('f-notas').value.trim(),
     foto: tempPhoto
@@ -1931,16 +2212,31 @@ async function saveBird() {
   }
 
   await saveState();
+  // Sincronizar con el Mercado público
+  await syncMarketListing(data);
   renderBirds();
   closeModal('modal-bird');
+}
+
+// Obtiene el teléfono del dueño (si soy sub-usuario, el de mi padre)
+function getOwnerPhone() {
+  return (state.ownerProfile && state.ownerProfile.phone) ||
+         (state.userProfile && state.userProfile.phone) || '';
+}
+// Obtiene el nombre del criadero del dueño
+function getOwnerCriadero() {
+  return (state.ownerProfile && state.ownerProfile.criadero) ||
+         (state.userProfile && state.userProfile.criadero) || '';
 }
 
 function deleteCurrentBird() {
   if (!state.editingBirdId) return;
   askConfirm('¿Eliminar ave?', 'Esta acción no se puede deshacer.', async () => {
-    state.birds = state.birds.filter(b => b.id !== state.editingBirdId);
-    state.pending = state.pending.filter(p => p.birdId !== state.editingBirdId);
+    const delId = state.editingBirdId;
+    state.birds = state.birds.filter(b => b.id !== delId);
+    state.pending = state.pending.filter(p => p.birdId !== delId);
     await saveState();
+    await removeFromMarket(delId);
     renderBirds();
     closeModal('modal-bird');
     toast('🗑️ Ave eliminada');
@@ -2004,8 +2300,10 @@ function renderBirds() {
     const f = state.currentFilter;
     if (f === 'Gallo' && b.genero !== 'Gallo') return false;
     if (f === 'Gallina' && b.genero !== 'Gallina') return false;
+    if (f === 'Pollo' && b.genero !== 'Pollo') return false;
     if (f === 'vivo' && b.vital !== 'vivo') return false;
     if (f === 'muerto' && b.vital !== 'muerto') return false;
+    if (f === 'venta' && b.vital !== 'venta') return false;
     if (f === 'vendido' && b.vital !== 'vendido') return false;
     // Filtros por coronas
     if (f === 'crown1' && crownLevel(b) < 1) return false;
@@ -2031,9 +2329,10 @@ function renderBirds() {
   }
 
   list.innerHTML = birds.map(b => {
-    const photoHtml = b.foto ? `<img src="${b.foto}">` : (b.genero === 'Gallo' ? '🐓' : '🐔');
+    const photoHtml = b.foto ? `<img src="${b.foto}">` : (b.genero === 'Gallo' ? '🐓' : b.genero === 'Pollo' ? '🐤' : '🐔');
     const vitalBadge = b.vital === 'muerto' ? '<span class="badge dead">✝ Muerto</span>' :
-                       b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' : '';
+                       b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' :
+                       b.vital === 'venta' ? '<span class="badge" style="background:#27AE60;color:#fff;">En venta</span>' : '';
     return `<div class="bird-item" onclick="showBirdDetail('${b.id}')">
       <div class="bird-photo">${photoHtml}</div>
       <div class="bird-info">
@@ -2061,6 +2360,7 @@ function showBirdDetail(id) {
 
   const vitalBadge = b.vital === 'muerto' ? '<span class="badge dead">✝ Muerto</span>' :
                      b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' :
+                     b.vital === 'venta' ? `<span class="badge" style="background:#27AE60;color:#fff;">En venta · $${b.precio||0}</span>` :
                      '<span class="badge healthy">Vivo</span>';
 
   document.getElementById('detail-content').innerHTML = `
