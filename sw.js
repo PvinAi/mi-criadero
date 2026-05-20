@@ -1,7 +1,7 @@
 // Mi Criadero - Service Worker
 // Permite que la app funcione sin internet una vez instalada
 
-const CACHE_NAME = 'mi-criadero-v1';
+const CACHE_NAME = 'mi-criadero-v2';
 const ASSETS = [
   './',
   './index.html',
