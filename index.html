@@ -22,6 +22,9 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 
+<!-- SheetJS para Excel (.xlsx) -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -77,6 +80,10 @@ body { padding-bottom: 90px; min-height: 100vh; }
 .bird-photo img { width: 100%; height: 100%; object-fit: cover; }
 .bird-info { flex: 1; min-width: 0; }
 .bird-name { font-size: 18px; font-weight: 600; margin-bottom: 2px; }
+.status-icons { font-size: 14px; letter-spacing: 1px; }
+.perm-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e5e5ea; font-size: 15px; cursor: pointer; }
+.perm-row:last-child { border-bottom: none; }
+.perm-row input[type=checkbox] { width: 22px; height: 22px; accent-color: #C0392B; flex-shrink: 0; }
 .bird-meta { font-size: 14px; color: #8e8e93; }
 .bird-chevron { color: #c7c7cc; font-size: 20px; }
 .empty-state { text-align: center; padding: 60px 30px; color: #8e8e93; }
@@ -329,6 +336,11 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
     <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todas</div>
     <div class="filter-chip" data-filter="Gallo" onclick="setFilter('Gallo')">Gallos</div>
     <div class="filter-chip" data-filter="Gallina" onclick="setFilter('Gallina')">Gallinas</div>
+    <div class="filter-chip" data-filter="crown1" onclick="setFilter('crown1')">👑 Campeones</div>
+    <div class="filter-chip" data-filter="crown2" onclick="setFilter('crown2')">👑👑 2+</div>
+    <div class="filter-chip" data-filter="crown3" onclick="setFilter('crown3')">👑👑👑 3</div>
+    <div class="filter-chip" data-filter="diamond" onclick="setFilter('diamond')">💎 Madres</div>
+    <div class="filter-chip" data-filter="sick" onclick="setFilter('sick')">🚑 Enfermos</div>
     <div class="filter-chip" data-filter="vivo" onclick="setFilter('vivo')">Vivos</div>
     <div class="filter-chip" data-filter="muerto" onclick="setFilter('muerto')">Muertos</div>
     <div class="filter-chip" data-filter="vendido" onclick="setFilter('vendido')">Vendidos</div>
@@ -408,6 +420,7 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
     </div>
 
     <button class="btn-big secondary" id="admin-panel-btn" onclick="showPage('admin')" style="display:none;">👑 Panel de Administrador</button>
+    <button class="btn-big secondary" id="team-btn" onclick="showPage('team')" style="display:none;">👥 Mi Equipo (sub-usuarios)</button>
     <button class="btn-big secondary" onclick="changePassword()">🔑 Cambiar mi contraseña</button>
     <button class="btn-big secondary" onclick="exportExcel()">📥 Descargar plantilla Excel</button>
     <button class="btn-big secondary" onclick="exportData()">📤 Exportar mis datos (Excel)</button>
@@ -429,6 +442,7 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   </div>
   <div class="page-content">
     <button class="btn-big" onclick="openNewUserForm()">+ Crear nuevo usuario</button>
+    <button class="btn-big secondary" onclick="exportUsers()">📊 Descargar lista de usuarios (Excel)</button>
     <div class="form-section" style="padding: 14px; margin-bottom: 16px; text-align: center;">
       <div style="font-size: 13px; color: #8e8e93;">USUARIOS REGISTRADOS</div>
       <div style="font-size: 24px; font-weight: 700; color: #C0392B;" id="admin-total-users">0</div>
@@ -438,6 +452,24 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
       </div>
     </div>
     <div id="admin-users-list"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: MI EQUIPO (sub-usuarios) -->
+<div class="page" id="page-team">
+  <div class="page-header">
+    <h2>👥 Mi Equipo</h2>
+    <p>Personas con acceso a tu criadero</p>
+  </div>
+  <div class="page-content">
+    <div class="form-section" style="padding: 14px; margin-bottom: 16px;">
+      <div class="help-text" style="padding:0;">
+        Puedes dar acceso a tu criadero a hasta <strong>3 personas</strong> de tu confianza
+        (cuidadores, familiares). Tú eliges qué pueden hacer. Verán solo TUS aves.
+      </div>
+    </div>
+    <button class="btn-big" id="add-subuser-btn" onclick="openNewSubuserForm()">+ Agregar persona a mi equipo</button>
+    <div id="team-list"></div>
   </div>
 </div>
 
@@ -473,12 +505,16 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
     </div>
     <div class="modal-body">
       <div class="photo-upload">
-        <div class="photo-preview" id="photo-preview" onclick="document.getElementById('photo-input').click()">
+        <div class="photo-preview" id="photo-preview" onclick="choosePhotoSource()">
           <span id="photo-placeholder">📷</span>
         </div>
-        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
-        <button class="photo-btn" onclick="document.getElementById('photo-input').click()">Agregar foto</button>
-        <button class="photo-btn" onclick="clearPhoto()" id="clear-photo-btn" style="display:none; color:#ff3b30;">Quitar</button>
+        <input type="file" id="photo-input-camera" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(event)">
+        <input type="file" id="photo-input-gallery" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button class="photo-btn" onclick="document.getElementById('photo-input-camera').click()">📸 Tomar foto</button>
+          <button class="photo-btn" onclick="document.getElementById('photo-input-gallery').click()">🖼️ Elegir de galería</button>
+          <button class="photo-btn" onclick="clearPhoto()" id="clear-photo-btn" style="display:none; color:#ff3b30;">Quitar</button>
+        </div>
       </div>
 
       <div class="form-section-title">Identificación</div>
@@ -500,7 +536,11 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
         </div>
         <div class="form-row">
           <label class="form-label">Color</label>
-          <select class="form-select" id="f-color"></select>
+          <select class="form-select" id="f-color" onchange="onColorChange()"></select>
+        </div>
+        <div class="form-row" id="f-color-otro-row" style="display:none;">
+          <label class="form-label">Especifica</label>
+          <input type="text" class="form-input" id="f-color-otro" placeholder="Escribe el color">
         </div>
         <div class="form-row">
           <label class="form-label">Línea/Raza</label>
@@ -590,7 +630,7 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
     <div class="modal-header">
       <button class="modal-btn" onclick="closeModal('modal-detail')">Cerrar</button>
       <div class="modal-title">Detalle</div>
-      <button class="modal-btn primary" onclick="editCurrentBird()">Editar</button>
+      <button class="modal-btn primary" id="detail-edit-btn" onclick="editCurrentBird()">Editar</button>
     </div>
     <div id="detail-content"></div>
   </div>
@@ -779,13 +819,59 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
   </div>
 </div>
 
+<!-- MODAL: NUEVO SUB-USUARIO -->
+<div class="modal-overlay" id="modal-subuser">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-subuser')">Cancelar</button>
+      <div class="modal-title" id="subuser-title">Agregar a mi equipo</div>
+      <button class="modal-btn primary" id="save-subuser-btn" onclick="saveSubuser()">Crear</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-text" style="background:#fff4d4; padding:10px; border-radius:8px; margin-bottom:12px;">
+        ⚠️ Copia los datos al terminar y entrégalos a la persona. La contraseña no se podrá ver de nuevo.
+      </div>
+      <div class="form-section-title">Datos de la persona</div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Nombre</label>
+          <input type="text" class="form-input" id="su-name" placeholder="Nombre completo">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Correo</label>
+          <input type="email" class="form-input" id="su-email" placeholder="correo@ejemplo.com">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Contraseña</label>
+          <input type="text" class="form-input" id="su-password" placeholder="Mínimo 6 caracteres">
+        </div>
+      </div>
+      <button class="btn-big secondary" onclick="genSubuserPassword()">🎲 Generar contraseña</button>
+
+      <div class="form-section-title">¿Qué puede hacer esta persona?</div>
+      <div class="form-section" id="su-permissions">
+        <label class="perm-row"><input type="checkbox" id="perm-viewBirds" checked> <span>Ver las aves</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-addBirds"> <span>Agregar aves nuevas</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-editBirds"> <span>Editar aves existentes</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-deleteBirds"> <span>Eliminar aves</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-zones"> <span>Cambiar la zona de las aves</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-fights"> <span>Registrar peleas</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-health"> <span>Registrar salud / problemas</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-inventory"> <span>Ver y editar inventario/costos</span></label>
+        <label class="perm-row"><input type="checkbox" id="perm-tree"> <span>Ver árbol genealógico</span></label>
+      </div>
+      <button class="btn-big" id="delete-subuser-btn" onclick="deleteSubuser()" style="display:none; background:#ff3b30; color:#fff; margin-top:14px;">🗑️ Quitar del equipo</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /app-content -->
 
 <div class="toast" id="toast"></div>
 
 <script>
 // =========== DATOS ============
-const COLORES = ["Colorado","Cenizo","Senizo","Giro","Giro negro","Giro giro","Hatch","Kelso","Sweater","Pinto","Búcaro","Melado","Canelo","Jiro","Cenizo plateado","Cenizo azul","Negro","Negro pecho colorado","Pecho negro","Plateado","Dorado","Barrado","Garganta negra","Garganta colorada","Mugre","Jabao","Asil","Radio","Rubio","Trigueño","Albañil","Tostado","Cenizo humo","Azul","Azul acero","Blanco","Blanco sucio","Moro","Morocho","Chispeado","Manchado","Carey","Coliblanco","Colinegro","Colirubio","Cara blanca","Cara roja","Patas amarillas","Patas verdes","Pico hueso","Pico negro","Pinto colorado","Pinto negro","Ceniciento","Café quemado","Chocolate","Castaño","Leonado","Amarillo","Bronceado","Acerado","Veteado","Mil flores","Ala de pato","Garganta de oro","Cola de golondrina"];
+const COLORES = ["Colorado","Giro","Cenizo","Negro","Pinto","Mandarino","Jabao","Blanco","Gris","Moro","Canelo","Otro"];
 
 // =========== ESTADO ============
 let state = {
@@ -803,7 +889,11 @@ let state = {
   isAdmin: false,
   allUsers: [],      // sólo cargado si es admin
   editingUserId: null,
-  unsubscribers: []  // listeners de Firestore para limpiar
+  unsubscribers: [],  // listeners de Firestore para limpiar
+  // Sub-usuarios / permisos
+  perms: null,        // permisos del usuario actual si es sub-usuario (null = dueño con todo)
+  dataOwnerId: null,  // de quién son los datos que estoy viendo (mi padre si soy sub-usuario)
+  myTeam: []          // sub-usuarios que YO creé
 };
 
 // =========== AUTH / FIREBASE ============
@@ -931,23 +1021,49 @@ async function onUserLoggedIn(user) {
       }
     }
 
-    // Cargar datos del criadero del usuario
+    // ¿Es un sub-usuario? (tiene parentId)
+    const isSubuser = !!state.userProfile.parentId;
+    if (isSubuser) {
+      state.perms = state.userProfile.permissions || {};
+      state.dataOwnerId = state.userProfile.parentId;
+      // Verificar que el padre no esté vencido/suspendido
+      try {
+        const parentSnap = await window.fb.getDoc(window.fb.doc(window.fb.db, 'users', state.dataOwnerId));
+        if (parentSnap.exists()) {
+          const p = parentSnap.data();
+          if (p.status === 'suspended' || (p.expiresAt && new Date(p.expiresAt) < new Date())) {
+            showFullLoader(false);
+            document.getElementById('login-error').textContent = '⏰ El criadero al que perteneces no está activo. Contacta a tu administrador.';
+            document.getElementById('login-error').classList.add('show');
+            await window.fb.signOut(window.fb.auth);
+            return;
+          }
+        }
+      } catch(e) { /* continuar */ }
+    } else {
+      state.perms = null;  // dueño = todos los permisos
+      state.dataOwnerId = user.uid;
+    }
+
+    // Cargar datos del criadero (los del dueño si soy sub-usuario)
     await loadUserData();
 
     // Mostrar la app
     document.getElementById('login-screen').classList.remove('active');
     document.getElementById('app-content').classList.add('active');
 
-    // Mostrar botón admin si corresponde
+    // Botones según rol
     document.getElementById('admin-panel-btn').style.display = state.isAdmin ? 'block' : 'none';
+    // El botón "Mi equipo" solo para dueños (no sub-usuarios, no admin)
+    document.getElementById('team-btn').style.display = (!isSubuser && !state.isAdmin) ? 'block' : 'none';
 
-    // Llenar info de usuario en pantalla "Más"
+    // Aplicar permisos a la interfaz
+    applyPermissions();
+
     updateUserInfoUI();
-
     renderBirds();
     showFullLoader(false);
 
-    // Si es admin, ir cargando lista de usuarios en background
     if (state.isAdmin) loadAllUsers();
 
   } catch(e) {
@@ -957,11 +1073,40 @@ async function onUserLoggedIn(user) {
   }
 }
 
+// Verifica si el usuario actual tiene un permiso. Dueño/admin = siempre true.
+function can(permission) {
+  if (state.perms === null) return true;  // dueño tiene todo
+  return !!state.perms[permission];
+}
+
+// Oculta/muestra elementos de la interfaz según permisos del sub-usuario
+function applyPermissions() {
+  // Botón + para agregar aves
+  const addBtn = document.querySelector('.btn-add');
+  if (addBtn) addBtn.style.display = can('addBirds') ? 'block' : 'none';
+
+  // Pestañas inferiores: ocultar las que no puede ver
+  const navInventory = document.querySelector('.nav-btn[data-page="inventory"]');
+  if (navInventory) navInventory.style.display = can('inventory') ? 'flex' : 'none';
+  const navTree = document.querySelector('.nav-btn[data-page="tree"]');
+  if (navTree) navTree.style.display = can('tree') ? 'flex' : 'none';
+
+  // Si está en una página sin permiso, volver a aves
+  // (los sub-usuarios siempre pueden ver aves por defecto)
+}
+
 function updateUserInfoUI() {
   document.getElementById('more-user-name').textContent = state.userProfile.name || state.user.email;
   document.getElementById('more-user-email').textContent = state.user.email;
-  let meta = state.isAdmin ? '👑 Administrador' : '👤 Criador';
-  if (state.userProfile.expiresAt) {
+  let meta;
+  if (state.isAdmin) {
+    meta = '👑 Administrador';
+  } else if (state.userProfile.parentId) {
+    meta = '👥 Equipo de ' + (state.userProfile.parentName || 'tu criadero');
+  } else {
+    meta = '👤 Criador';
+  }
+  if (state.userProfile.expiresAt && !state.userProfile.parentId) {
     const d = new Date(state.userProfile.expiresAt);
     meta += ` · Vence: ${d.toLocaleDateString()}`;
   }
@@ -977,6 +1122,9 @@ function onUserLoggedOut() {
   state.inventory = [];
   state.pending = [];
   state.allUsers = [];
+  state.perms = null;
+  state.dataOwnerId = null;
+  state.myTeam = [];
   document.getElementById('app-content').classList.remove('active');
   document.getElementById('login-screen').classList.add('active');
   document.getElementById('login-email').value = '';
@@ -1000,9 +1148,9 @@ function initAuth() {
 
 // =========== STORAGE EN FIREBASE ============
 async function loadUserData() {
-  const uid = state.user.uid;
-  // Datos privados del usuario: users/{uid}/data/main
-  const dataRef = window.fb.doc(window.fb.db, 'users', uid, 'data', 'main');
+  // Si soy sub-usuario, cargo los datos de mi "dueño" (padre); si no, los míos
+  const ownerId = state.dataOwnerId || state.user.uid;
+  const dataRef = window.fb.doc(window.fb.db, 'users', ownerId, 'data', 'main');
   const snap = await window.fb.getDoc(dataRef);
   if (snap.exists()) {
     const d = snap.data();
@@ -1021,7 +1169,8 @@ function saveState() {
     if (!state.user) return;
     try {
       showSyncStatus('☁️ Sincronizando...');
-      const dataRef = window.fb.doc(window.fb.db, 'users', state.user.uid, 'data', 'main');
+      const ownerId = state.dataOwnerId || state.user.uid;
+      const dataRef = window.fb.doc(window.fb.db, 'users', ownerId, 'data', 'main');
       await window.fb.setDoc(dataRef, {
         birds: state.birds,
         zones: state.zones,
@@ -1037,7 +1186,7 @@ function saveState() {
   }, 800);
 }
 
-// Compatibilidad: la función loadState ya no se usa, pero algunos llamados antiguos podrían referenciarla
+// Compatibilidad: la función loadState ya no se usa
 function loadState() {}
 
 // =========== ADMIN: GESTIÓN DE USUARIOS ============
@@ -1052,6 +1201,27 @@ async function loadAllUsers() {
   } catch(e) {
     console.error('Error cargando usuarios:', e);
   }
+}
+
+function exportUsers() {
+  if (!state.isAdmin) { toast('⚠️ Solo el administrador'); return; }
+  if (state.allUsers.length === 0) { toast('⚠️ No hay usuarios'); return; }
+  const headers = ['Nombre','Correo','Teléfono','Criadero','Rol','Estado','Creado','Vence'];
+  const rows = state.allUsers.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(u => [
+    u.name||'', u.email||'', u.phone||'', u.criadero || (u.parentName ? 'Equipo de '+u.parentName : ''),
+    u.role === 'admin' ? 'Administrador' : (u.role === 'subuser' ? 'Sub-usuario' : 'Criador'),
+    u.status === 'suspended' ? 'Suspendido' : 'Activo',
+    u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '',
+    u.expiresAt ? new Date(u.expiresAt).toLocaleDateString() : 'Sin vencimiento'
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [{wch:22},{wch:26},{wch:16},{wch:20},{wch:14},{wch:12},{wch:12},{wch:14}];
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:headers.length-1}}) };
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'USUARIOS');
+  const fecha = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `USUARIOS_MI_CRIADERO_${fecha}.xlsx`);
+  toast('📊 Lista de usuarios descargada');
 }
 
 function renderAdminUsers() {
@@ -1073,8 +1243,10 @@ function renderAdminUsers() {
     let statusText = '<span class="user-status-active">● Activo</span>';
     if (u.status === 'suspended') statusText = '<span class="user-status-suspended">● Suspendido</span>';
     else if (u.expiresAt && new Date(u.expiresAt) < new Date()) statusText = '<span class="user-status-expired">● Vencido</span>';
-    const roleText = u.role === 'admin' ? '<span class="admin-badge">ADMIN</span>' : '';
-    const expText = u.expiresAt ? `Vence: ${new Date(u.expiresAt).toLocaleDateString()}` : 'Sin vencimiento';
+    let roleText = u.role === 'admin' ? '<span class="admin-badge">ADMIN</span>' : '';
+    if (u.role === 'subuser') roleText = '<span class="admin-badge" style="background:#5856d6;">EQUIPO</span>';
+    let expText = u.expiresAt ? `Vence: ${new Date(u.expiresAt).toLocaleDateString()}` : 'Sin vencimiento';
+    if (u.role === 'subuser') expText = 'Equipo de ' + (u.parentName || '—');
     return `<div class="user-row" onclick="openEditUser('${u.id}')">
       <div class="user-avatar">${initial}</div>
       <div class="user-row-info">
@@ -1319,6 +1491,203 @@ async function doChangePassword() {
   }
 }
 
+// =========== MI EQUIPO (SUB-USUARIOS) ============
+const PERM_KEYS = ['viewBirds','addBirds','editBirds','deleteBirds','zones','fights','health','inventory','tree'];
+const PERM_LABELS = {
+  viewBirds:'Ver aves', addBirds:'Agregar aves', editBirds:'Editar aves',
+  deleteBirds:'Eliminar aves', zones:'Cambiar zonas', fights:'Registrar peleas',
+  health:'Registrar salud', inventory:'Inventario/costos', tree:'Árbol genealógico'
+};
+
+async function loadMyTeam() {
+  if (!state.user) return;
+  try {
+    const q = window.fb.query(
+      window.fb.collection(window.fb.db, 'users'),
+      window.fb.where('parentId', '==', state.user.uid)
+    );
+    const snap = await window.fb.getDocs(q);
+    state.myTeam = [];
+    snap.forEach(d => state.myTeam.push({ id: d.id, ...d.data() }));
+    renderTeam();
+  } catch(e) {
+    console.error('Error cargando equipo:', e);
+    renderTeam();
+  }
+}
+
+function renderTeam() {
+  const list = document.getElementById('team-list');
+  const addBtn = document.getElementById('add-subuser-btn');
+  if (addBtn) addBtn.style.display = state.myTeam.length >= 3 ? 'none' : 'block';
+
+  if (state.myTeam.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="big-icon">👥</div><h2>Aún no tienes equipo</h2><p>Agrega hasta 3 personas de confianza</p></div>';
+    return;
+  }
+  list.innerHTML = state.myTeam.map(u => {
+    const initial = (u.name || u.email || '?').charAt(0).toUpperCase();
+    const perms = u.permissions || {};
+    const activePerms = PERM_KEYS.filter(k => perms[k]).map(k => PERM_LABELS[k]);
+    const statusText = u.status === 'suspended'
+      ? '<span class="user-status-suspended">● Suspendido</span>'
+      : '<span class="user-status-active">● Activo</span>';
+    return `<div class="user-row" onclick="openEditSubuser('${u.id}')">
+      <div class="user-avatar">${initial}</div>
+      <div class="user-row-info">
+        <div class="user-row-name">${u.name || 'Sin nombre'}</div>
+        <div class="user-row-email">${u.email}</div>
+        <div class="user-row-meta">${statusText} · ${activePerms.length} permiso${activePerms.length!==1?'s':''}</div>
+      </div>
+      <div class="bird-chevron">›</div>
+    </div>`;
+  }).join('');
+}
+
+function genSubuserPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pwd = '';
+  for (let i = 0; i < 8; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  document.getElementById('su-password').value = pwd;
+}
+
+function setPermCheckboxes(perms) {
+  PERM_KEYS.forEach(k => {
+    const el = document.getElementById('perm-' + k);
+    if (el) el.checked = !!perms[k];
+  });
+}
+
+function readPermCheckboxes() {
+  const perms = {};
+  PERM_KEYS.forEach(k => {
+    const el = document.getElementById('perm-' + k);
+    perms[k] = el ? el.checked : false;
+  });
+  return perms;
+}
+
+function openNewSubuserForm() {
+  if (state.myTeam.length >= 3) { toast('⚠️ Máximo 3 personas en tu equipo'); return; }
+  state.editingSubuserId = null;
+  document.getElementById('subuser-title').textContent = 'Agregar a mi equipo';
+  document.getElementById('save-subuser-btn').textContent = 'Crear';
+  document.getElementById('su-name').value = '';
+  document.getElementById('su-email').value = '';
+  document.getElementById('su-password').value = '';
+  document.getElementById('su-email').disabled = false;
+  document.getElementById('su-password').parentElement.style.display = 'flex';
+  document.getElementById('delete-subuser-btn').style.display = 'none';
+  setPermCheckboxes({ viewBirds: true });
+  openModal('modal-subuser');
+}
+
+function openEditSubuser(uid) {
+  const u = state.myTeam.find(x => x.id === uid);
+  if (!u) return;
+  state.editingSubuserId = uid;
+  document.getElementById('subuser-title').textContent = 'Editar miembro';
+  document.getElementById('save-subuser-btn').textContent = 'Guardar';
+  document.getElementById('su-name').value = u.name || '';
+  document.getElementById('su-email').value = u.email || '';
+  document.getElementById('su-email').disabled = true;
+  document.getElementById('su-password').value = '';
+  document.getElementById('su-password').parentElement.style.display = 'none';
+  document.getElementById('delete-subuser-btn').style.display = 'block';
+  setPermCheckboxes(u.permissions || {});
+  openModal('modal-subuser');
+}
+
+async function saveSubuser() {
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim().toLowerCase();
+  const password = document.getElementById('su-password').value;
+  const perms = readPermCheckboxes();
+
+  if (!name) { toast('⚠️ Falta el nombre'); return; }
+
+  const btn = document.getElementById('save-subuser-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    if (state.editingSubuserId) {
+      await window.fb.updateDoc(
+        window.fb.doc(window.fb.db, 'users', state.editingSubuserId),
+        { name: name, permissions: perms }
+      );
+      closeModal('modal-subuser');
+      await loadMyTeam();
+      toast('✅ Miembro actualizado');
+    } else {
+      if (!email || !email.includes('@')) { toast('⚠️ Correo inválido'); btn.disabled=false; btn.textContent='Crear'; return; }
+      if (!password || password.length < 6) { toast('⚠️ Contraseña mínimo 6 caracteres'); btn.disabled=false; btn.textContent='Crear'; return; }
+
+      const { initializeApp, deleteApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const { getAuth: getAuth2, createUserWithEmailAndPassword: createUser2, signOut: signOut2 } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+      const tempApp = initializeApp({
+        apiKey: "AIzaSyCe2Fwuonn9hNu5H9As65O-dtudnVFeWXI",
+        authDomain: "mi-criadero-ea258.firebaseapp.com",
+        projectId: "mi-criadero-ea258",
+        storageBucket: "mi-criadero-ea258.firebasestorage.app",
+        messagingSenderId: "1084308767268",
+        appId: "1:1084308767268:web:95f10a6f4ff783ec5f4eb1"
+      }, 'temp-su-' + Date.now());
+      const tempAuth = getAuth2(tempApp);
+      const cred = await createUser2(tempAuth, email, password);
+      const newUid = cred.user.uid;
+
+      await window.fb.setDoc(window.fb.doc(window.fb.db, 'users', newUid), {
+        email: email,
+        name: name,
+        role: 'subuser',
+        status: 'active',
+        parentId: state.user.uid,
+        parentName: state.userProfile.name || state.user.email,
+        permissions: perms,
+        createdAt: new Date().toISOString(),
+        createdBy: state.user.uid
+      });
+
+      await signOut2(tempAuth);
+      await deleteApp(tempApp);
+
+      closeModal('modal-subuser');
+      await loadMyTeam();
+
+      const txt = `ACCESO PARA TU EQUIPO\n\nNombre: ${name}\nCorreo: ${email}\nContraseña: ${password}\n\nApp: ${window.location.origin}${window.location.pathname}\n\nIMPORTANTE: Copia estos datos AHORA. La contraseña no se podrá ver de nuevo.`;
+      if (navigator.clipboard) {
+        try { await navigator.clipboard.writeText(txt); alert(txt + '\n\n✅ Copiado al portapapeles'); }
+        catch(e) { alert(txt); }
+      } else { alert(txt); }
+      toast('✅ Miembro agregado');
+    }
+  } catch(e) {
+    console.error(e);
+    let msg = 'Error al guardar';
+    if (e.code === 'auth/email-already-in-use') msg = '⚠️ Este correo ya está registrado';
+    else if (e.code === 'auth/invalid-email') msg = '⚠️ Correo inválido';
+    else if (e.code === 'auth/weak-password') msg = '⚠️ Contraseña muy débil';
+    toast(msg);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = state.editingSubuserId ? 'Guardar' : 'Crear';
+  }
+}
+
+async function deleteSubuser() {
+  if (!state.editingSubuserId) return;
+  if (!confirm('¿Quitar a esta persona de tu equipo?\n\nPerderá el acceso a tu criadero.')) return;
+  try {
+    await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'users', state.editingSubuserId));
+    closeModal('modal-subuser');
+    await loadMyTeam();
+    toast('🗑️ Miembro eliminado');
+  } catch(e) {
+    toast('⚠️ Error al eliminar');
+  }
+}
+
 // =========== UTILIDADES ============
 function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
 function toast(msg) {
@@ -1339,6 +1708,7 @@ function showPage(name) {
   if (name === 'inventory') renderInventory();
   if (name === 'pending') renderPending();
   if (name === 'admin') { loadAllUsers(); }
+  if (name === 'team') { loadMyTeam(); }
   window.scrollTo(0,0);
 }
 function setFilter(f) {
@@ -1377,11 +1747,24 @@ function openBirdForm(birdId = null) {
     const b = state.birds.find(x => x.id === birdId);
     if (!b) return;
     document.getElementById('bird-form-title').textContent = 'Editar Ave';
-    document.getElementById('delete-bird-btn').style.display = 'block';
+    document.getElementById('delete-bird-btn').style.display = can('deleteBirds') ? 'block' : 'none';
     document.getElementById('f-placa').value = b.placa || '';
     document.getElementById('f-nombre').value = b.nombre || '';
     document.getElementById('f-genero').value = b.genero || 'Gallo';
-    document.getElementById('f-color').value = b.color || '';
+    // Color: si el color guardado está en la lista corta, seleccionarlo; si no, es "Otro"
+    if (b.color && COLORES.includes(b.color) && b.color !== 'Otro') {
+      document.getElementById('f-color').value = b.color;
+      document.getElementById('f-color-otro-row').style.display = 'none';
+      document.getElementById('f-color-otro').value = '';
+    } else if (b.color) {
+      document.getElementById('f-color').value = 'Otro';
+      document.getElementById('f-color-otro-row').style.display = 'flex';
+      document.getElementById('f-color-otro').value = b.color;
+    } else {
+      document.getElementById('f-color').value = '';
+      document.getElementById('f-color-otro-row').style.display = 'none';
+      document.getElementById('f-color-otro').value = '';
+    }
     document.getElementById('f-linea').value = b.linea || '';
     document.getElementById('f-nacimiento').value = b.nacimiento || '';
     document.getElementById('f-peso').value = b.peso || '';
@@ -1408,12 +1791,31 @@ function openBirdForm(birdId = null) {
     ['f-placa','f-nombre','f-linea','f-nacimiento','f-peso','f-padre','f-madre','f-origen','f-vitaminas','f-problema','f-notas'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-genero').value = 'Gallo';
     document.getElementById('f-color').value = '';
+    document.getElementById('f-color-otro-row').style.display = 'none';
+    document.getElementById('f-color-otro').value = '';
     document.getElementById('f-estado').value = 'En cuido';
     document.getElementById('f-zona').value = '';
     document.getElementById('f-vital').value = 'vivo';
     resetPhotoUI();
   }
   openModal('modal-bird');
+}
+
+function onColorChange() {
+  const val = document.getElementById('f-color').value;
+  const row = document.getElementById('f-color-otro-row');
+  if (val === 'Otro') {
+    row.style.display = 'flex';
+  } else {
+    row.style.display = 'none';
+    document.getElementById('f-color-otro').value = '';
+  }
+}
+
+function choosePhotoSource() {
+  // En móvil, al tocar la foto, mostramos los botones (ya visibles). 
+  // Esta función abre galería por defecto al tocar el círculo.
+  document.getElementById('photo-input-gallery').click();
 }
 
 function resetPhotoUI() {
@@ -1454,11 +1856,18 @@ async function saveBird() {
   const placa = document.getElementById('f-placa').value.trim();
   if (!placa) { toast('⚠️ Debes ingresar el número de placa'); return; }
 
+  // Color: si es "Otro", usar el texto personalizado
+  let colorVal = document.getElementById('f-color').value;
+  if (colorVal === 'Otro') {
+    const otro = document.getElementById('f-color-otro').value.trim();
+    colorVal = otro || 'Otro';
+  }
+
   const data = {
     placa: placa,
     nombre: document.getElementById('f-nombre').value.trim(),
     genero: document.getElementById('f-genero').value,
-    color: document.getElementById('f-color').value,
+    color: colorVal,
     linea: document.getElementById('f-linea').value.trim(),
     nacimiento: document.getElementById('f-nacimiento').value,
     peso: document.getElementById('f-peso').value,
@@ -1524,15 +1933,72 @@ function deleteCurrentBird() {
   });
 }
 
+// =========== ÍCONOS DE ESTADO DE AVES ============
+// Cuenta victorias de un ave
+function countVictories(b) {
+  return (b.fights || []).filter(f => f.resultado === 'W').length;
+}
+// Número de coronas según victorias: 1 victoria=1, 2-4=2, 5+=3
+function crownLevel(b) {
+  const v = countVictories(b);
+  if (v >= 5) return 3;
+  if (v >= 2) return 2;
+  if (v >= 1) return 1;
+  return 0;
+}
+// ¿Es campeón? (tiene al menos 1 corona)
+function isChampion(b) {
+  return crownLevel(b) > 0;
+}
+// ¿Es gallina madre de campeona/campeón? (alguna cría suya tiene corona)
+function isDiamondHen(b) {
+  if (b.genero !== 'Gallina') return false;
+  return state.birds.some(child => {
+    const padreRef = findBirdByRef(child.padre);
+    const madreRef = findBirdByRef(child.madre);
+    const isChild = (madreRef && madreRef.id === b.id) || (padreRef && padreRef.id === b.id);
+    return isChild && isChampion(child);
+  });
+}
+// ¿Está enfermo? (estado Recuperación o tiene problema de salud en log reciente sin resolver)
+function isSick(b) {
+  if (b.estado === 'Recuperación') return true;
+  // Si tiene pendientes de salud abiertos
+  return state.pending.some(p => p.birdId === b.id && p.type === 'salud' && !p.done);
+}
+// ¿Necesita/toma medicamento o vitaminas?
+function needsMedicine(b) {
+  return !!(b.vitaminas && b.vitaminas.trim());
+}
+// Genera el HTML de íconos de estado para un ave
+function statusIconsHtml(b) {
+  let icons = '';
+  const crowns = crownLevel(b);
+  if (crowns > 0) {
+    icons += '👑'.repeat(crowns);
+  }
+  if (isDiamondHen(b)) icons += '💎';
+  if (isSick(b)) icons += '🚑';
+  if (needsMedicine(b)) icons += '⚠️';
+  return icons ? `<span class="status-icons">${icons}</span>` : '';
+}
+
 function renderBirds() {
   const q = (document.getElementById('search-input').value || '').toLowerCase();
   const list = document.getElementById('bird-list');
   let birds = state.birds.filter(b => {
-    if (state.currentFilter === 'Gallo' && b.genero !== 'Gallo') return false;
-    if (state.currentFilter === 'Gallina' && b.genero !== 'Gallina') return false;
-    if (state.currentFilter === 'vivo' && b.vital !== 'vivo') return false;
-    if (state.currentFilter === 'muerto' && b.vital !== 'muerto') return false;
-    if (state.currentFilter === 'vendido' && b.vital !== 'vendido') return false;
+    const f = state.currentFilter;
+    if (f === 'Gallo' && b.genero !== 'Gallo') return false;
+    if (f === 'Gallina' && b.genero !== 'Gallina') return false;
+    if (f === 'vivo' && b.vital !== 'vivo') return false;
+    if (f === 'muerto' && b.vital !== 'muerto') return false;
+    if (f === 'vendido' && b.vital !== 'vendido') return false;
+    // Filtros por coronas
+    if (f === 'crown1' && crownLevel(b) < 1) return false;
+    if (f === 'crown2' && crownLevel(b) < 2) return false;
+    if (f === 'crown3' && crownLevel(b) < 3) return false;
+    if (f === 'diamond' && !isDiamondHen(b)) return false;
+    if (f === 'sick' && !isSick(b)) return false;
     if (q) {
       const txt = `${b.placa} ${b.nombre} ${b.color} ${b.linea}`.toLowerCase();
       if (!txt.includes(q)) return false;
@@ -1557,13 +2023,14 @@ function renderBirds() {
     return `<div class="bird-item" onclick="showBirdDetail('${b.id}')">
       <div class="bird-photo">${photoHtml}</div>
       <div class="bird-info">
-        <div class="bird-name">${b.placa}${b.nombre ? ' · ' + b.nombre : ''}</div>
+        <div class="bird-name">${b.placa}${b.nombre ? ' · ' + b.nombre : ''} ${statusIconsHtml(b)}</div>
         <div class="bird-meta">${b.genero} · ${b.color || 'Sin color'} ${vitalBadge}</div>
       </div>
       <div class="bird-chevron">›</div>
     </div>`;
   }).join('');
 }
+
 
 function showBirdDetail(id) {
   const b = state.birds.find(x => x.id === id);
@@ -1575,6 +2042,9 @@ function showBirdDetail(id) {
   const stats = { W: 0, T: 0, L: 0 };
   fights.forEach(f => { if (stats[f.resultado] !== undefined) stats[f.resultado]++; });
 
+  // Botón editar visible solo si tiene permiso
+  document.getElementById('detail-edit-btn').style.display = can('editBirds') ? 'block' : 'none';
+
   const vitalBadge = b.vital === 'muerto' ? '<span class="badge dead">✝ Muerto</span>' :
                      b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' :
                      '<span class="badge healthy">Vivo</span>';
@@ -1583,7 +2053,7 @@ function showBirdDetail(id) {
     <div class="detail-photo">${photoHtml}</div>
     <div class="detail-section">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <h3 style="margin:0;">${b.placa}${b.nombre ? ' · ' + b.nombre : ''}</h3>
+        <h3 style="margin:0;">${b.placa}${b.nombre ? ' · ' + b.nombre : ''} ${statusIconsHtml(b)}</h3>
         ${vitalBadge}
       </div>
       <div class="detail-row"><span class="label">Género</span><span class="value">${b.genero}</span></div>
@@ -1623,7 +2093,7 @@ function showBirdDetail(id) {
           ${f.notas ? `<div style="font-size:13px; margin-top:4px;">${f.notas}</div>` : ''}
         </div>
       `).join('') : '<div style="color:#8e8e93; font-size:14px;">Sin peleas registradas</div>'}
-      <button class="btn-big secondary" style="margin-top:12px;" onclick="openFightForm()">+ Agregar pelea</button>
+      ${can('fights') ? '<button class="btn-big secondary" style="margin-top:12px;" onclick="openFightForm()">+ Agregar pelea</button>' : ''}
     </div>
     ${b.notas ? `<div class="detail-section"><h3>Notas</h3><div style="font-size:14px;">${b.notas}</div></div>` : ''}
   `;
@@ -1915,61 +2385,79 @@ async function deletePending(id) {
 }
 
 // =========== EXCEL EXPORT/IMPORT ============
-const TEMPLATE_HEADERS = ['Placa','Nombre','Genero','Color','Linea','Nacimiento','Peso','Padre','Madre','Origen','Estado','Zona','Vital','Vitaminas','Notas'];
+const TEMPLATE_HEADERS = ['Placa','Nombre','Genero','Color','Linea','Nacimiento','Edad','Peso','Padre','Madre','Origen','Estado','Zona','Vital','Vitaminas','Notas'];
 
+// Calcula edad en años y meses desde una fecha de nacimiento (texto YYYY-MM-DD)
+function calcEdad(nacimiento) {
+  if (!nacimiento) return '';
+  const nac = new Date(nacimiento);
+  if (isNaN(nac)) return '';
+  const hoy = new Date();
+  let meses = (hoy.getFullYear() - nac.getFullYear()) * 12 + (hoy.getMonth() - nac.getMonth());
+  if (hoy.getDate() < nac.getDate()) meses--;
+  if (meses < 0) return '';
+  const años = Math.floor(meses / 12);
+  const m = meses % 12;
+  if (años === 0) return `${m} mes${m !== 1 ? 'es' : ''}`;
+  if (m === 0) return `${años} año${años !== 1 ? 's' : ''}`;
+  return `${años}a ${m}m`;
+}
+
+// Construye una hoja con formato de tabla a partir de filas (array de objetos por header)
+function buildSheet(rows) {
+  const aoa = [TEMPLATE_HEADERS, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // Anchos de columna
+  ws['!cols'] = [
+    {wch:8},{wch:16},{wch:9},{wch:12},{wch:14},{wch:12},{wch:9},{wch:7},
+    {wch:8},{wch:8},{wch:14},{wch:14},{wch:12},{wch:8},{wch:14},{wch:20}
+  ];
+  // Formato de tabla (autofilter sobre el rango)
+  const range = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:rows.length, c:TEMPLATE_HEADERS.length-1}});
+  ws['!autofilter'] = { ref: range };
+  return ws;
+}
+
+function birdToRow(b) {
+  const zone = state.zones.find(z => z.id === b.zona);
+  return [
+    b.placa||'', b.nombre||'', b.genero||'', b.color||'', b.linea||'',
+    b.nacimiento||'', calcEdad(b.nacimiento), b.peso||'', b.padre||'', b.madre||'',
+    b.origen||'', b.estado||'', zone?zone.name:'', b.vital||'', b.vitaminas||'',
+    (b.notas||'').replace(/[\r\n]+/g,' ')
+  ];
+}
+
+// Descargar plantilla CON aves de ejemplo
 function exportExcel() {
-  // Plantilla vacía (CSV)
-  let csv = '\ufeff' + TEMPLATE_HEADERS.join(',') + '\n';
-  csv += '001,Ejemplo,Gallo,Colorado,Kelso x Sweater,2024-01-15,2.30,P001,M001,Criador X,En cuido,Zona A,vivo,Complejo B,Ejemplo de fila\n';
-  downloadFile(csv, 'plantilla_criadero.csv', 'text/csv;charset=utf-8;');
+  const ejemplos = [
+    ['152','Regalo','Gallo','Colorado','','2024-05-25','', '','52','125','','En cuido','Voladeros','vivo','',''],
+    ['1078','BOMBA','Gallo','Colorado','KELSON','2025-01-08','','2.5','85','95','','Moviéndose','Voladeros','vivo','Vitamina C',''],
+    ['14','Brasa','Gallina','Cenizo','Selva','2024-06-21','','2.0','52','95','','Descanso','','vivo','',''],
+    ['122','BRASA MORTAL','Gallo','Giro','','2025-12-30','','1.8','1078','14','','En cuido','Zona B','vivo','','']
+  ];
+  // Recalcular edad de ejemplos
+  ejemplos.forEach(r => { r[6] = calcEdad(r[5]); });
+  const ws = buildSheet(ejemplos);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'PLANTILLA MI CRIADERO');
+  XLSX.writeFile(wb, 'PLANTILLA_MI_CRIADERO.xlsx');
   toast('📥 Plantilla descargada');
 }
 
+// Exportar MIS datos (sin ejemplos)
 function exportData() {
-  let csv = '\ufeff' + TEMPLATE_HEADERS.join(',') + '\n';
-  state.birds.forEach(b => {
-    const zone = state.zones.find(z => z.id === b.zona);
-    const row = [b.placa, b.nombre, b.genero, b.color, b.linea, b.nacimiento, b.peso, b.padre, b.madre, b.origen, b.estado, zone ? zone.name : '', b.vital, b.vitaminas, (b.notas || '').replace(/[\r\n]+/g, ' ')];
-    csv += row.map(v => {
-      v = (v || '').toString();
-      if (v.includes(',') || v.includes('"')) return '"' + v.replace(/"/g, '""') + '"';
-      return v;
-    }).join(',') + '\n';
-  });
-  downloadFile(csv, 'criadero_export.csv', 'text/csv;charset=utf-8;');
+  if (state.birds.length === 0) { toast('⚠️ No tienes aves para exportar'); return; }
+  const rows = state.birds
+    .slice()
+    .sort((a,b)=>(a.placa||'').localeCompare(b.placa||'',undefined,{numeric:true}))
+    .map(birdToRow);
+  const ws = buildSheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'MI CRIADERO');
+  const fecha = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `MI_CRIADERO_${fecha}.xlsx`);
   toast('📤 Datos exportados');
-}
-
-function downloadFile(content, filename, type) {
-  const blob = new Blob([content], {type});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function parseCSV(text) {
-  const rows = [];
-  let row = [], field = '', inQuotes = false;
-  text = text.replace(/^\ufeff/, '');
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
-      else if (c === '"') inQuotes = false;
-      else field += c;
-    } else {
-      if (c === '"') inQuotes = true;
-      else if (c === ',') { row.push(field); field = ''; }
-      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
-      else if (c === '\r') { /* skip */ }
-      else field += c;
-    }
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  return rows;
 }
 
 async function importExcel(e) {
@@ -1978,37 +2466,46 @@ async function importExcel(e) {
   const reader = new FileReader();
   reader.onload = async (ev) => {
     try {
-      const rows = parseCSV(ev.target.result);
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       if (rows.length < 2) { toast('⚠️ Archivo vacío'); return; }
-      const headers = rows[0].map(h => h.trim());
+      const headers = rows[0].map(h => (h||'').toString().trim());
       const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
       let added = 0;
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
-        if (!r[idx('Placa')]) continue;
-        const zoneName = r[idx('Zona')];
+        const placa = (r[idx('Placa')]||'').toString().trim();
+        if (!placa) continue;
+        const zoneName = (r[idx('Zona')]||'').toString().trim();
         let zone = state.zones.find(z => z.name === zoneName);
-        if (zoneName && !zone) {
-          zone = {id: uid(), name: zoneName};
-          state.zones.push(zone);
+        if (zoneName && !zone) { zone = {id:uid(), name:zoneName}; state.zones.push(zone); }
+        // Convertir fecha si viene como número de Excel
+        let nacimiento = r[idx('Nacimiento')];
+        if (typeof nacimiento === 'number') {
+          const d = XLSX.SSF.parse_date_code(nacimiento);
+          if (d) nacimiento = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+        } else {
+          nacimiento = (nacimiento||'').toString().split(' ')[0].split('T')[0];
         }
         state.birds.push({
           id: uid(),
-          placa: r[idx('Placa')] || '',
-          nombre: r[idx('Nombre')] || '',
-          genero: r[idx('Genero')] || 'Gallo',
-          color: r[idx('Color')] || '',
-          linea: r[idx('Linea')] || '',
-          nacimiento: r[idx('Nacimiento')] || '',
-          peso: r[idx('Peso')] || '',
-          padre: r[idx('Padre')] || '',
-          madre: r[idx('Madre')] || '',
-          origen: r[idx('Origen')] || '',
-          estado: r[idx('Estado')] || 'En cuido',
+          placa: placa,
+          nombre: (r[idx('Nombre')]||'').toString().trim(),
+          genero: (r[idx('Genero')]||'Gallo').toString().trim() || 'Gallo',
+          color: (r[idx('Color')]||'').toString().trim(),
+          linea: (r[idx('Linea')]||'').toString().trim(),
+          nacimiento: nacimiento,
+          peso: (r[idx('Peso')]||'').toString().trim(),
+          padre: (r[idx('Padre')]||'').toString().trim(),
+          madre: (r[idx('Madre')]||'').toString().trim(),
+          origen: (r[idx('Origen')]||'').toString().trim(),
+          estado: (r[idx('Estado')]||'En cuido').toString().trim() || 'En cuido',
           zona: zone ? zone.id : '',
-          vital: r[idx('Vital')] || 'vivo',
-          vitaminas: r[idx('Vitaminas')] || '',
-          notas: r[idx('Notas')] || '',
+          vital: (r[idx('Vital')]||'vivo').toString().trim() || 'vivo',
+          vitaminas: (r[idx('Vitaminas')]||'').toString().trim(),
+          notas: (r[idx('Notas')]||'').toString().trim(),
           fights: [],
           healthLog: []
         });
@@ -2018,11 +2515,12 @@ async function importExcel(e) {
       renderBirds();
       toast(`✅ ${added} aves importadas`);
     } catch(err) {
-      toast('⚠️ Error: revisa el formato');
+      console.error(err);
+      toast('⚠️ Error: revisa el formato del archivo');
     }
     e.target.value = '';
   };
-  reader.readAsText(file, 'utf-8');
+  reader.readAsArrayBuffer(file);
 }
 
 // =========== DATOS DE EJEMPLO ============
