@@ -29,7 +29,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCe2Fwuonn9hNu5H9As65O-dtudnVFeWXI",
@@ -42,7 +42,18 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Firestore con persistencia offline (caché local en el dispositivo).
+// Permite ver y editar datos sin internet; sincroniza al recuperar señal.
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (e) {
+  // Si falla (navegador sin soporte), usar Firestore normal
+  console.warn('Persistencia offline no disponible, usando modo online:', e);
+  db = getFirestore(app);
+}
 
 // Exponer para uso global
 window.fb = {
@@ -256,6 +267,8 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
 /* Estado de sincronización */
 .sync-status { position: fixed; top: 8px; right: 12px; padding: 4px 10px; background: rgba(0,0,0,0.7); color: white; border-radius: 12px; font-size: 11px; z-index: 1001; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 .sync-status.show { opacity: 1; }
+.offline-banner { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 8px 16px; background: #ff9500; color: #fff; border-radius: 20px; font-size: 12px; font-weight: 500; z-index: 1002; opacity: 0; transition: opacity 0.3s; pointer-events: none; max-width: 90%; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+.offline-banner.show { opacity: 1; }
 
 /* User chip en header */
 .user-chip { display: flex; align-items: center; gap: 6px; padding: 4px 10px; background: #f2f2f7; border-radius: 16px; font-size: 12px; color: #1c1c1e; cursor: pointer; }
@@ -319,6 +332,7 @@ textarea.form-input { resize: vertical; min-height: 60px; padding: 4px 0; }
 
 <!-- Sync status -->
 <div class="sync-status" id="sync-status">Sincronizando...</div>
+<div class="offline-banner" id="offline-banner">Sin conexión · Tus cambios se guardarán al volver el internet</div>
 
 <!-- CONTENIDO PRINCIPAL DE LA APP -->
 <div class="app-content" id="app-content">
@@ -2584,6 +2598,26 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW:', err));
   });
 }
+
+// =========== DETECTOR DE CONEXIÓN ============
+function updateConnectionStatus() {
+  const banner = document.getElementById('offline-banner');
+  if (!banner) return;
+  if (navigator.onLine) {
+    banner.classList.remove('show');
+  } else {
+    banner.classList.add('show');
+  }
+}
+window.addEventListener('online', () => {
+  updateConnectionStatus();
+  showSyncStatus('✓ Conexión recuperada');
+});
+window.addEventListener('offline', () => {
+  updateConnectionStatus();
+});
+updateConnectionStatus();
+
 </script>
 </body>
 </html>
