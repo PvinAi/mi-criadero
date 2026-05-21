@@ -959,6 +959,18 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
   </div>
 </div>
 
+<!-- MODAL: MAPEO DE IMPORTACIÓN -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-import')">Cancelar</button>
+      <div class="modal-title" id="import-modal-title">Importar aves</div>
+      <button class="modal-btn primary" id="import-confirm-btn" onclick="doImportMapped()">Importar</button>
+    </div>
+    <div class="modal-body" id="import-map-body"></div>
+  </div>
+</div>
+
 <!-- MODAL: MI PERFIL DE CRIADERO -->
 <div class="modal-overlay" id="modal-profile">
   <div class="modal">
@@ -3070,6 +3082,29 @@ function exportData() {
   toast('📤 Datos exportados');
 }
 
+// =========== IMPORTADOR INTELIGENTE ============
+// Campos destino de la app y palabras clave para auto-detectar la columna del usuario
+const IMPORT_FIELDS = [
+  { key: 'placa',      label: 'Placa (número de identificación)', keywords: ['placa','numero','número','id','anilla','n°','no','codigo','código'] },
+  { key: 'nombre',     label: 'Nombre', keywords: ['nombre','alias','name'] },
+  { key: 'genero',     label: 'Género (Gallo/Gallina)', keywords: ['sexo','genero','género','tipo','sex'] },
+  { key: 'color',      label: 'Color', keywords: ['color','capa','pluma'] },
+  { key: 'linea',      label: 'Línea/Raza', keywords: ['linea','línea','raza','casta','familia','breed'] },
+  { key: 'nacimiento', label: 'Fecha de nacimiento', keywords: ['nacimiento','f.nc','fnc','fecha','nac','nacim','f. nac','edad'] },
+  { key: 'peso',       label: 'Peso', keywords: ['peso','kg','libras','lbs','weight'] },
+  { key: 'padre',      label: 'Padre', keywords: ['padre','papa','papá','father','sire'] },
+  { key: 'madre',      label: 'Madre', keywords: ['madre','mama','mamá','mother','dam'] },
+  { key: 'origen',     label: 'Origen/Criador', keywords: ['origen','criador','procedencia','origin'] },
+  { key: 'estado',     label: 'Estado', keywords: ['estado','status','situacion','situación'] },
+  { key: 'zona',       label: 'Zona/Ubicación', keywords: ['zona','ubicacion','ubicación','jaula','corral','area','área','lugar'] },
+  { key: 'vitaminas',  label: 'Vitaminas/Medicina', keywords: ['vitamina','vitaminas','medicina','medicamento','tratamiento'] },
+  { key: 'notas',      label: 'Notas/Observaciones', keywords: ['nota','notas','observacion','observación','observaciones','comentario','detalle'] },
+];
+
+let _importRows = null;
+let _importHeaders = null;
+let _importWorkbook = null;
+
 async function importExcel(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -3077,60 +3112,224 @@ async function importExcel(e) {
   reader.onload = async (ev) => {
     try {
       const data = new Uint8Array(ev.target.result);
-      const wb = XLSX.read(data, {type:'array'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-      if (rows.length < 2) { toast('⚠️ Archivo vacío'); return; }
-      const headers = rows[0].map(h => (h||'').toString().trim());
-      const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
-      let added = 0;
-      for (let i = 1; i < rows.length; i++) {
-        const r = rows[i];
-        const placa = (r[idx('Placa')]||'').toString().trim();
-        if (!placa) continue;
-        const zoneName = (r[idx('Zona')]||'').toString().trim();
-        let zone = state.zones.find(z => z.name === zoneName);
-        if (zoneName && !zone) { zone = {id:uid(), name:zoneName}; state.zones.push(zone); }
-        // Convertir fecha si viene como número de Excel
-        let nacimiento = r[idx('Nacimiento')];
-        if (typeof nacimiento === 'number') {
-          const d = XLSX.SSF.parse_date_code(nacimiento);
-          if (d) nacimiento = `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
-        } else {
-          nacimiento = (nacimiento||'').toString().split(' ')[0].split('T')[0];
-        }
-        state.birds.push({
-          id: uid(),
-          placa: placa,
-          nombre: (r[idx('Nombre')]||'').toString().trim(),
-          genero: (r[idx('Genero')]||'Gallo').toString().trim() || 'Gallo',
-          color: (r[idx('Color')]||'').toString().trim(),
-          linea: (r[idx('Linea')]||'').toString().trim(),
-          nacimiento: nacimiento,
-          peso: (r[idx('Peso')]||'').toString().trim(),
-          padre: (r[idx('Padre')]||'').toString().trim(),
-          madre: (r[idx('Madre')]||'').toString().trim(),
-          origen: (r[idx('Origen')]||'').toString().trim(),
-          estado: (r[idx('Estado')]||'En cuido').toString().trim() || 'En cuido',
-          zona: zone ? zone.id : '',
-          vital: (r[idx('Vital')]||'vivo').toString().trim() || 'vivo',
-          vitaminas: (r[idx('Vitaminas')]||'').toString().trim(),
-          notas: (r[idx('Notas')]||'').toString().trim(),
-          fights: [],
-          healthLog: []
-        });
-        added++;
+      _importWorkbook = XLSX.read(data, {type:'array'});
+      // Filtrar hojas que tienen datos (más de 1 fila)
+      const sheetsWithData = _importWorkbook.SheetNames.filter(name => {
+        const ws = _importWorkbook.Sheets[name];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        return rows.filter(r => r.some(c => c !== '' && c != null)).length >= 2;
+      });
+      if (sheetsWithData.length === 0) { toast('⚠️ El archivo está vacío'); e.target.value=''; return; }
+      if (sheetsWithData.length === 1) {
+        // Una sola hoja: ir directo al mapeo
+        processSheet(sheetsWithData[0]);
+      } else {
+        // Varias hojas: dejar elegir
+        openSheetSelector(sheetsWithData);
       }
-      await saveState();
-      renderBirds();
-      toast(`✅ ${added} aves importadas`);
     } catch(err) {
       console.error(err);
-      toast('⚠️ Error: revisa el formato del archivo');
+      toast('⚠️ No se pudo leer el archivo. ¿Es un Excel válido?');
     }
     e.target.value = '';
   };
   reader.readAsArrayBuffer(file);
+}
+
+// Muestra un selector cuando el Excel tiene varias hojas
+function openSheetSelector(sheetNames) {
+  const body = document.getElementById('import-map-body');
+  // Contar aves por hoja para mostrar al usuario
+  const info = sheetNames.map(name => {
+    const ws = _importWorkbook.Sheets[name];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    const count = Math.max(0, rows.filter(r => r.some(c => c !== '' && c != null)).length - 1);
+    return { name, count };
+  });
+  let html = `<div class="help-text" style="padding:10px 14px; background:#EEF6F2; border-radius:8px; margin-bottom:14px; color:#1A1F2E; font-size:13px;">
+    Tu archivo tiene <strong>${sheetNames.length} hojas</strong>. Elige cuál quieres importar:
+  </div>`;
+  html += '<div class="form-section">';
+  info.forEach(s => {
+    html += `<div class="user-row" onclick="processSheet('${s.name.replace(/'/g,"\\'")}')">
+      <div class="user-avatar"><i class="ti ti-table"></i></div>
+      <div class="user-row-info">
+        <div class="user-row-name">${s.name}</div>
+        <div class="user-row-meta">${s.count} ${s.count === 1 ? 'fila' : 'filas'} de datos</div>
+      </div>
+      <div class="bird-chevron">›</div>
+    </div>`;
+  });
+  html += '</div>';
+  // Ocultar el botón Importar en esta fase (aún no se eligió hoja)
+  document.getElementById('import-confirm-btn').style.display = 'none';
+  document.getElementById('import-modal-title').textContent = 'Elige una hoja';
+  body.innerHTML = html;
+  openModal('modal-import');
+}
+
+// Procesa una hoja específica: detecta encabezados y abre el mapeo
+function processSheet(sheetName) {
+  const ws = _importWorkbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  // Buscar la fila de encabezados (primera con al menos 2 celdas de texto)
+  let headerRow = 0;
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const textCells = rows[i].filter(c => c && isNaN(Number(c)) && c.toString().trim().length > 1).length;
+    if (textCells >= 2) { headerRow = i; break; }
+  }
+  _importHeaders = rows[headerRow].map(h => (h||'').toString().trim());
+  _importRows = rows.slice(headerRow + 1).filter(r => r.some(c => c !== '' && c != null));
+  document.getElementById('import-confirm-btn').style.display = '';
+  openImportMapping();
+}
+
+// Auto-detecta qué columna del usuario corresponde a cada campo
+function autoDetectColumn(fieldKeywords) {
+  for (let i = 0; i < _importHeaders.length; i++) {
+    const h = _importHeaders[i].toLowerCase().trim();
+    if (!h) continue;
+    for (const kw of fieldKeywords) {
+      if (h === kw || h.startsWith(kw) || h.includes(kw)) return i;
+    }
+  }
+  return -1;
+}
+
+function openImportMapping() {
+  const body = document.getElementById('import-map-body');
+  document.getElementById('import-modal-title').textContent = 'Importar aves';
+  // Para cada campo de la app, un <select> con las columnas del usuario
+  const colOptions = (selected) => '<option value="-1">— No importar —</option>' +
+    _importHeaders.map((h, i) => `<option value="${i}" ${i===selected?'selected':''}>${h || 'Columna '+(i+1)}</option>`).join('');
+
+  let html = `<div class="help-text" style="padding:10px 14px; background:#EEF6F2; border-radius:8px; margin-bottom:14px; color:#1A1F2E; font-size:13px;">
+    Detectamos <strong>${_importRows.length} aves</strong> en tu archivo con <strong>${_importHeaders.length} columnas</strong>.
+    Revisa que cada dato esté bien asignado y toca <strong>Importar</strong>.
+  </div>`;
+  html += '<div class="form-section">';
+  for (const f of IMPORT_FIELDS) {
+    const detected = autoDetectColumn(f.keywords);
+    html += `<div class="form-row">
+      <label class="form-label" style="font-size:14px;">${f.label}</label>
+      <select class="form-select" id="map-${f.key}">${colOptions(detected)}</select>
+    </div>`;
+  }
+  html += '</div>';
+  html += `<div class="help-text" style="padding:8px 14px; color:#8B93A7; font-size:12px;">
+    Las columnas que no asignes (como Cresta, Marcas, etc.) se guardarán juntas en las Notas de cada ave, para no perder información.
+  </div>`;
+  body.innerHTML = html;
+  openModal('modal-import');
+}
+
+// Limpieza de género
+function cleanGenero(val) {
+  const v = (val||'').toString().trim().toUpperCase();
+  if (!v) return 'Gallo';
+  if (v.startsWith('M') ) return 'Gallo';     // MACHO, M, MM
+  if (v.startsWith('H')) return 'Gallina';    // HEMBRA, H, HH
+  if (v.startsWith('G') && v.includes('LLO')) return 'Gallo';
+  if (v.includes('LLINA')) return 'Gallina';
+  if (v.startsWith('P')) return 'Pollo';      // POLLO, P
+  return 'Gallo';
+}
+
+// Limpieza de color (abreviaturas comunes)
+function cleanColor(val) {
+  const v = (val||'').toString().trim();
+  if (!v) return '';
+  const map = {
+    'N':'Negro', 'NEGRO':'Negro',
+    'G':'Giro', 'GIRO':'Giro',
+    'R':'Colorado', 'ROJO':'Colorado', 'COLORADO':'Colorado',
+    'C':'Cenizo', 'CENIZO':'Cenizo',
+    'B':'Blanco', 'BLANCO':'Blanco',
+    'P':'Pinto', 'PINTO':'Pinto',
+    'GR':'Gris', 'GRIS':'Gris', 'GRILLA':'Gris',
+    'M':'Moro', 'MORO':'Moro',
+    'CANELO':'Canelo', 'JABAO':'Jabao', 'MANDARINO':'Mandarino',
+    'RUBIA':'Rubio', 'RUBIO':'Rubio',
+  };
+  const up = v.toUpperCase();
+  return map[up] || (v.charAt(0).toUpperCase() + v.slice(1).toLowerCase());
+}
+
+async function doImportMapped() {
+  // Leer el mapeo elegido
+  const mapping = {};
+  IMPORT_FIELDS.forEach(f => {
+    const sel = document.getElementById('map-' + f.key);
+    mapping[f.key] = sel ? parseInt(sel.value) : -1;
+  });
+  // Validar que al menos placa esté asignada
+  if (mapping.placa < 0) {
+    toast('⚠️ Debes asignar al menos la columna de Placa');
+    return;
+  }
+  // Columnas que NO se mapearon → irán a notas
+  const usedCols = new Set(Object.values(mapping).filter(v => v >= 0));
+  const extraCols = _importHeaders.map((h,i)=>({h,i})).filter(x => !usedCols.has(x.i) && x.h);
+
+  const btn = document.getElementById('import-confirm-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="loader"></span>';
+
+  let added = 0;
+  const get = (r, key) => mapping[key] >= 0 ? (r[mapping[key]] ?? '') : '';
+  const fmtDate = (val) => {
+    if (val == null || val === '') return '';
+    if (typeof val === 'number') {
+      const d = XLSX.SSF.parse_date_code(val);
+      if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+    }
+    return val.toString().split(' ')[0].split('T')[0];
+  };
+
+  for (const r of _importRows) {
+    const placa = get(r,'placa').toString().trim();
+    if (!placa) continue;
+    // Notas: combinar la columna notas + columnas extra
+    let notasParts = [];
+    const notaBase = get(r,'notas').toString().trim();
+    if (notaBase) notasParts.push(notaBase);
+    extraCols.forEach(x => {
+      const val = (r[x.i] ?? '').toString().trim();
+      if (val) notasParts.push(`${x.h}: ${val}`);
+    });
+    // Zona
+    const zoneName = get(r,'zona').toString().trim();
+    let zone = state.zones.find(z => z.name === zoneName);
+    if (zoneName && !zone) { zone = {id:uid(), name:zoneName}; state.zones.push(zone); }
+
+    state.birds.push({
+      id: uid(),
+      placa: placa,
+      nombre: get(r,'nombre').toString().trim(),
+      genero: mapping.genero >= 0 ? cleanGenero(get(r,'genero')) : 'Gallo',
+      color: mapping.color >= 0 ? cleanColor(get(r,'color')) : '',
+      linea: get(r,'linea').toString().trim(),
+      nacimiento: fmtDate(get(r,'nacimiento')),
+      peso: get(r,'peso').toString().trim(),
+      padre: get(r,'padre').toString().trim(),
+      madre: get(r,'madre').toString().trim(),
+      origen: get(r,'origen').toString().trim(),
+      estado: get(r,'estado').toString().trim() || 'En cuido',
+      zona: zone ? zone.id : '',
+      vital: 'vivo',
+      vitaminas: get(r,'vitaminas').toString().trim(),
+      notas: notasParts.join(' · '),
+      fights: [],
+      healthLog: []
+    });
+    added++;
+  }
+
+  await saveState();
+  renderBirds();
+  closeModal('modal-import');
+  btn.disabled = false; btn.textContent = 'Importar';
+  _importRows = null; _importHeaders = null;
+  toast(`✅ ${added} aves importadas correctamente`);
 }
 
 // =========== DATOS DE EJEMPLO ============
