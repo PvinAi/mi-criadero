@@ -319,6 +319,11 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
 .btn-big i { vertical-align: -2px; margin-right: 6px; }
 .market-criadero, .zone-name i { color: #2BA77D; }
 .big-icon i { font-size: 56px; color: #C5CAD4; }
+/* Pestañas de genealogía */
+.tree-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tree-tab { flex: 1; background: #fff; border: 0.5px solid #E3E6EC; border-radius: 10px; padding: 12px 8px; font-size: 13px; font-weight: 500; color: #5F6B7E; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.tree-tab.active { background: #1A1F2E; color: #fff; border-color: #1A1F2E; }
+.tree-tab i { font-size: 16px; }
 
 /* ===== Color de marca: header y acentos ===== */
 .header h1 { color: #1A1F2E; }
@@ -430,19 +435,54 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
 <!-- PÁGINA: ÁRBOL -->
 <div class="page" id="page-tree">
   <div class="page-header">
-    <h2><i class="ti ti-binary-tree"></i> Árbol Genealógico</h2>
-    <p>Selecciona un ave para ver su árbol</p>
+    <h2><i class="ti ti-binary-tree"></i> Genealogía</h2>
+    <p>Árbol y análisis de líneas</p>
   </div>
   <div class="page-content">
-    <div class="form-section">
-      <div class="form-row">
-        <label class="form-label">Ave</label>
-        <select class="form-select" id="tree-select" onchange="renderTree()">
-          <option value="">-- Elige un ave --</option>
-        </select>
-      </div>
+    <!-- Selector de sub-sección -->
+    <div class="tree-tabs">
+      <button class="tree-tab active" id="tab-tree" onclick="switchTreeTab('tree')">
+        <i class="ti ti-binary-tree"></i> Árbol Genealógico
+      </button>
+      <button class="tree-tab" id="tab-line" onclick="switchTreeTab('line')">
+        <i class="ti ti-chart-dots"></i> Análisis de Línea
+      </button>
     </div>
-    <div id="tree-display"></div>
+
+    <!-- SUB-SECCIÓN: Árbol genealógico -->
+    <div id="subsection-tree">
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Ave</label>
+          <select class="form-select" id="tree-select" onchange="renderTree()">
+            <option value="">-- Elige un ave --</option>
+          </select>
+        </div>
+      </div>
+      <div id="tree-display"></div>
+    </div>
+
+    <!-- SUB-SECCIÓN: Análisis de línea -->
+    <div id="subsection-line" style="display:none;">
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label">Padre</label>
+          <select class="form-select" id="line-padre" onchange="renderLineAnalysis()">
+            <option value="">-- Elige el padre --</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Madre</label>
+          <select class="form-select" id="line-madre" onchange="renderLineAnalysis()">
+            <option value="">-- Elige la madre --</option>
+          </select>
+        </div>
+      </div>
+      <div class="help-text" style="padding:0 4px 12px; color:#8B93A7; font-size:13px;">
+        Elige una pareja reproductora para ver la calidad de su descendencia. También puedes elegir solo el padre o solo la madre.
+      </div>
+      <div id="line-display"></div>
+    </div>
   </div>
 </div>
 
@@ -782,6 +822,16 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
             <option value="T">Tablas</option>
             <option value="L">Pierde</option>
           </select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Duración</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input type="number" min="0" max="999" class="form-input" id="ff-min" placeholder="Min" style="width:60px; text-align:center;">
+            <span style="color:#8B93A7;">:</span>
+            <input type="number" min="0" max="59" class="form-input" id="ff-seg" placeholder="Seg" style="width:60px; text-align:center;">
+            <span style="color:#8B93A7;">:</span>
+            <input type="number" min="0" max="9" class="form-input" id="ff-dec" placeholder="Déc" style="width:60px; text-align:center;">
+          </div>
         </div>
         <div class="form-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
           <label class="form-label">Notas</label>
@@ -1887,6 +1937,11 @@ async function syncMarketListing(bird) {
   const ref = window.fb.doc(window.fb.db, 'mercado', docId);
   try {
     if (bird.vital === 'venta') {
+      // Calcular datos de calidad del ave
+      const avg = avgWinTime(bird);
+      const fw = (bird.fights||[]).filter(f=>f.resultado==='W').length;
+      const ft = (bird.fights||[]).length;
+      const efec = ft > 0 ? Math.round((fw/ft)*100) : null;
       // Publicar / actualizar ficha pública
       await window.fb.setDoc(ref, {
         ownerId: ownerId,
@@ -1900,6 +1955,9 @@ async function syncMarketListing(bird) {
         foto: bird.foto || '',
         criadero: getOwnerCriadero(),
         phone: getOwnerPhone(),
+        avgWinTime: avg,
+        efectividad: efec,
+        totalPeleas: ft,
         publishedAt: new Date().toISOString()
       });
     } else {
@@ -1972,6 +2030,10 @@ function renderMarket() {
             <div>${m.genero} · Edad: ${edad}</div>
             <div>Color: ${m.color || '—'}${m.linea ? ' · Línea: ' + m.linea : ''}</div>
             <div class="market-criadero">Criadero ${m.criadero || '—'}</div>
+            ${(m.efectividad != null || m.avgWinTime != null) ? `<div style="margin-top:4px; display:flex; gap:10px; flex-wrap:wrap;">
+              ${m.efectividad != null ? `<span style="font-size:12px; color:#2BA77D; font-weight:600;"><i class="ti ti-target-arrow"></i> ${m.efectividad}% efectividad</span>` : ''}
+              ${m.avgWinTime != null ? `<span style="font-size:12px; color:#1A1F2E; font-weight:600;"><i class="ti ti-bolt" style="color:#EF9F27;"></i> ${formatDuration(m.avgWinTime)}</span>` : ''}
+            </div>` : ''}
           </div>
         </div>
       </div>
@@ -2017,7 +2079,7 @@ function showPage(name) {
   if (pageEl) pageEl.classList.add('active');
   const navBtn = document.querySelector(`.nav-btn[data-page="${name}"]`);
   if (navBtn) navBtn.classList.add('active');
-  if (name === 'tree') populateTreeSelect();
+  if (name === 'tree') { populateTreeSelect(); populateLineSelects(); }
   if (name === 'zones') renderZones();
   if (name === 'inventory') renderInventory();
   if (name === 'pending') renderPending();
@@ -2446,13 +2508,17 @@ function showBirdDetail(id) {
         <span class="result-T">Tablas: ${stats.T}</span>
         <span class="result-L">Perdidas: ${stats.L}</span>
       </div>
+      ${avgWinTime(b) != null ? `<div style="background:#1A1F2E; color:#fff; border-radius:10px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:13px; color:#8B93A7;"><i class="ti ti-bolt" style="color:#EF9F27;"></i> Tiempo promedio de victoria</span>
+        <span style="font-size:18px; font-weight:700; color:#5FD0A8;">${formatDuration(avgWinTime(b))}</span>
+      </div>` : ''}
       ${fights.length > 0 ? fights.slice().reverse().map(f => `
         <div class="fight-item">
           <div class="fight-header">
             <span>${f.fecha || '—'} · ${f.lugar || '—'}</span>
             <span class="result-${f.resultado}">${f.resultado === 'W' ? 'GANA' : f.resultado === 'T' ? 'TABLAS' : 'PIERDE'}</span>
           </div>
-          <div style="font-size:13px; color:#8B93A7;">vs ${f.rival || '—'} ${f.peso ? '· ' + f.peso + ' kg' : ''}</div>
+          <div style="font-size:13px; color:#8B93A7;">vs ${f.rival || '—'} ${f.peso ? '· ' + f.peso + ' kg' : ''} ${f.duracion != null ? '· <i class="ti ti-clock"></i> ' + formatDuration(f.duracion) : ''}</div>
           ${f.notas ? `<div style="font-size:13px; margin-top:4px;">${f.notas}</div>` : ''}
         </div>
       `).join('') : '<div style="color:#8B93A7; font-size:14px;">Sin peleas registradas</div>'}
@@ -2475,6 +2541,9 @@ function openFightForm() {
   document.getElementById('ff-rival').value = '';
   document.getElementById('ff-peso').value = '';
   document.getElementById('ff-resultado').value = 'W';
+  document.getElementById('ff-min').value = '';
+  document.getElementById('ff-seg').value = '';
+  document.getElementById('ff-dec').value = '';
   document.getElementById('ff-notas').value = '';
   openModal('modal-fight');
 }
@@ -2483,6 +2552,14 @@ async function saveFight() {
   const b = state.birds.find(x => x.id === state.currentBirdId);
   if (!b) return;
   if (!b.fights) b.fights = [];
+  // Duración en segundos (con décimas). Vacío = sin dato.
+  const min = parseInt(document.getElementById('ff-min').value) || 0;
+  const seg = parseInt(document.getElementById('ff-seg').value) || 0;
+  const dec = parseInt(document.getElementById('ff-dec').value) || 0;
+  const totalSeg = (min*60 + seg + dec/10);
+  const tieneDuracion = (document.getElementById('ff-min').value !== '' ||
+                         document.getElementById('ff-seg').value !== '' ||
+                         document.getElementById('ff-dec').value !== '');
   b.fights.push({
     id: uid(),
     fecha: document.getElementById('ff-fecha').value,
@@ -2490,12 +2567,30 @@ async function saveFight() {
     rival: document.getElementById('ff-rival').value.trim(),
     peso: document.getElementById('ff-peso').value,
     resultado: document.getElementById('ff-resultado').value,
+    duracion: tieneDuracion ? totalSeg : null,
     notas: document.getElementById('ff-notas').value.trim()
   });
   await saveState();
   closeModal('modal-fight');
   showBirdDetail(state.currentBirdId);
   toast('✅ Pelea registrada');
+}
+
+// Convierte segundos a texto "M:SS.d"
+function formatDuration(totalSeg) {
+  if (totalSeg == null || isNaN(totalSeg)) return '';
+  const min = Math.floor(totalSeg / 60);
+  const seg = Math.floor(totalSeg % 60);
+  const dec = Math.round((totalSeg - Math.floor(totalSeg)) * 10);
+  return `${min}:${String(seg).padStart(2,'0')}.${dec}`;
+}
+
+// Tiempo promedio de las peleas GANADAS de un ave (en segundos), o null
+function avgWinTime(b) {
+  const wins = (b.fights || []).filter(f => f.resultado === 'W' && f.duracion != null);
+  if (wins.length === 0) return null;
+  const sum = wins.reduce((a,f) => a + f.duracion, 0);
+  return sum / wins.length;
 }
 
 // =========== ÁRBOL GENEALÓGICO ============
@@ -2596,7 +2691,159 @@ function renderTree() {
   `;
 }
 
-// =========== ZONAS ============
+// =========== ANÁLISIS DE LÍNEA ============
+function switchTreeTab(tab) {
+  document.getElementById('tab-tree').classList.toggle('active', tab === 'tree');
+  document.getElementById('tab-line').classList.toggle('active', tab === 'line');
+  document.getElementById('subsection-tree').style.display = tab === 'tree' ? 'block' : 'none';
+  document.getElementById('subsection-line').style.display = tab === 'line' ? 'block' : 'none';
+  if (tab === 'line') populateLineSelects();
+}
+
+function populateLineSelects() {
+  const padres = state.birds.filter(b => b.genero === 'Gallo')
+    .sort((a,b) => (a.placa||'').localeCompare(b.placa||'', undefined, {numeric:true}));
+  const madres = state.birds.filter(b => b.genero === 'Gallina')
+    .sort((a,b) => (a.placa||'').localeCompare(b.placa||'', undefined, {numeric:true}));
+  const pSel = document.getElementById('line-padre');
+  const mSel = document.getElementById('line-madre');
+  const pv = pSel.value, mv = mSel.value;
+  pSel.innerHTML = '<option value="">-- Elige el padre --</option>' +
+    padres.map(b => `<option value="${b.id}">${b.placa}${b.nombre?' · '+b.nombre:''}</option>`).join('');
+  mSel.innerHTML = '<option value="">-- Elige la madre --</option>' +
+    madres.map(b => `<option value="${b.id}">${b.placa}${b.nombre?' · '+b.nombre:''}</option>`).join('');
+  if (pv) pSel.value = pv;
+  if (mv) mSel.value = mv;
+}
+
+// Encuentra las crías de un padre y/o madre (por placa/nombre en campos padre/madre)
+function findOffspring(padreBird, madreBird) {
+  return state.birds.filter(child => {
+    const cp = findBirdByRef(child.padre);
+    const cm = findBirdByRef(child.madre);
+    const matchPadre = padreBird ? (cp && cp.id === padreBird.id) : true;
+    const matchMadre = madreBird ? (cm && cm.id === madreBird.id) : true;
+    // Al menos uno de los dos debe estar seleccionado y coincidir
+    if (padreBird && madreBird) return matchPadre && matchMadre;
+    if (padreBird) return cp && cp.id === padreBird.id;
+    if (madreBird) return cm && cm.id === madreBird.id;
+    return false;
+  });
+}
+
+// Calcula estadísticas de un conjunto de aves (la descendencia)
+function lineStats(offspring) {
+  const machos = offspring.filter(b => b.genero === 'Gallo' || b.genero === 'Pollo').length;
+  const hembras = offspring.filter(b => b.genero === 'Gallina').length;
+  let wins = 0, losses = 0, ties = 0, winTimes = [];
+  offspring.forEach(b => {
+    (b.fights || []).forEach(f => {
+      if (f.resultado === 'W') { wins++; if (f.duracion != null) winTimes.push(f.duracion); }
+      else if (f.resultado === 'L') losses++;
+      else if (f.resultado === 'T') ties++;
+    });
+  });
+  const totalFights = wins + losses + ties;
+  const efectividad = totalFights > 0 ? Math.round((wins / totalFights) * 100) : null;
+  const avgTime = winTimes.length > 0 ? winTimes.reduce((a,t)=>a+t,0) / winTimes.length : null;
+  // Cuántas crías han peleado y ganado al menos una
+  const conPeleas = offspring.filter(b => (b.fights||[]).length > 0).length;
+  const ganadoras = offspring.filter(b => (b.fights||[]).some(f => f.resultado === 'W')).length;
+  return { total: offspring.length, machos, hembras, wins, losses, ties, totalFights,
+           efectividad, avgTime, conPeleas, ganadoras };
+}
+
+function renderLineAnalysis() {
+  const padreBird = state.birds.find(b => b.id === document.getElementById('line-padre').value);
+  const madreBird = state.birds.find(b => b.id === document.getElementById('line-madre').value);
+  const display = document.getElementById('line-display');
+
+  if (!padreBird && !madreBird) {
+    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-chart-dots"></i></div><h2>Elige una pareja</h2><p>Selecciona padre y/o madre para ver el análisis</p></div>';
+    return;
+  }
+
+  const offspring = findOffspring(padreBird, madreBird);
+  if (offspring.length === 0) {
+    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-search"></i></div><h2>Sin descendencia</h2><p>No se encontraron crías registradas de esta combinación. Verifica que las crías tengan bien escrito el padre/madre (placa o nombre).</p></div>';
+    return;
+  }
+
+  const s = lineStats(offspring);
+  // Valoración de calidad
+  let valoracion = '', valColor = '#8B93A7';
+  if (s.avgTime != null) {
+    if (s.avgTime <= 90) { valoracion = 'Línea rápida y efectiva'; valColor = '#5FD0A8'; }
+    else if (s.avgTime <= 180) { valoracion = 'Línea sólida'; valColor = '#EF9F27'; }
+    else { valoracion = 'Línea de fondo (resistencia)'; valColor = '#378ADD'; }
+  }
+
+  const parejaHtml = `
+    <div style="background:#fff; border-radius:12px; padding:14px; border:0.5px solid #E3E6EC; margin-bottom:12px;">
+      <div style="font-size:12px; color:#8B93A7; margin-bottom:8px;">PAREJA REPRODUCTORA</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="flex:1; text-align:center;">
+          <i class="ti ti-feather" style="color:#2BA77D; font-size:22px;"></i>
+          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">${padreBird ? 'Padre '+padreBird.placa : '— Cualquiera —'}</div>
+          <div style="font-size:11px; color:#8B93A7;">${padreBird ? (padreBird.nombre||'')+' · '+(padreBird.color||'') : ''}</div>
+        </div>
+        <div style="color:#C8881E;"><i class="ti ti-heart" style="font-size:18px;"></i></div>
+        <div style="flex:1; text-align:center;">
+          <i class="ti ti-feather" style="color:#378ADD; font-size:22px;"></i>
+          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">${madreBird ? 'Madre '+madreBird.placa : '— Cualquiera —'}</div>
+          <div style="font-size:11px; color:#8B93A7;">${madreBird ? (madreBird.nombre||'')+' · '+(madreBird.color||'') : ''}</div>
+        </div>
+      </div>
+    </div>`;
+
+  const statsHtml = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+      <div style="background:#fff; border-radius:12px; padding:14px; border:0.5px solid #E3E6EC; text-align:center;">
+        <div style="font-size:30px; font-weight:800; color:#1A1F2E;">${s.total}</div>
+        <div style="font-size:12px; color:#8B93A7;">Crías totales</div>
+        <div style="font-size:11px; color:#8B93A7; margin-top:2px;">${s.machos} machos · ${s.hembras} hembras</div>
+      </div>
+      <div style="background:#fff; border-radius:12px; padding:14px; border:0.5px solid #E3E6EC; text-align:center;">
+        <div style="font-size:30px; font-weight:800; color:#2BA77D;">${s.efectividad != null ? s.efectividad+'%' : '—'}</div>
+        <div style="font-size:12px; color:#8B93A7;">Efectividad</div>
+        <div style="font-size:11px; color:#8B93A7; margin-top:2px;">${s.wins} ganadas · ${s.losses} perdidas</div>
+      </div>
+    </div>`;
+
+  const tiempoHtml = s.avgTime != null ? `
+    <div style="background:#1A1F2E; border-radius:12px; padding:16px; text-align:center; margin-bottom:12px;">
+      <div style="font-size:12px; color:#8B93A7;">TIEMPO PROMEDIO DE VICTORIA</div>
+      <div style="font-size:34px; font-weight:800; color:#5FD0A8; margin:4px 0;">${formatDuration(s.avgTime)}</div>
+      <div style="font-size:12px; color:#fff;"><i class="ti ti-bolt" style="color:#EF9F27;"></i> ${valoracion}</div>
+    </div>` : '<div style="background:#F0F2F5; border-radius:12px; padding:14px; text-align:center; margin-bottom:12px; color:#8B93A7; font-size:13px;">Aún no hay tiempos de victoria registrados en esta línea</div>';
+
+  const criasHtml = `
+    <div style="font-size:12px; color:#8B93A7; margin-bottom:6px;">DESCENDENCIA (${offspring.length})</div>
+    <div style="background:#fff; border-radius:12px; border:0.5px solid #E3E6EC; overflow:hidden;">
+      ${offspring.slice().sort((a,b)=>(a.placa||'').localeCompare(b.placa||'',undefined,{numeric:true})).map(c => {
+        const avg = avgWinTime(c);
+        const cw = (c.fights||[]).filter(f=>f.resultado==='W').length;
+        const cl = (c.fights||[]).filter(f=>f.resultado==='L').length;
+        let estado, color;
+        if ((c.fights||[]).length === 0) { estado = 'Sin peleas'; color = '#8B93A7'; }
+        else if (avg != null) { estado = 'Gana ' + formatDuration(avg); color = '#2BA77D'; }
+        else if (cw > 0) { estado = cw + ' ganada' + (cw>1?'s':''); color = '#2BA77D'; }
+        else { estado = cl + ' perdida' + (cl>1?'s':''); color = '#E24B4A'; }
+        return `<div style="padding:10px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:0.5px solid #F0F2F5;" onclick="closeModalAndShowBird('${c.id}')">
+          <span style="font-size:14px; color:#1A1F2E;">${c.placa}${c.nombre?' · '+c.nombre:''} <span style="font-size:11px; color:#8B93A7;">(${c.genero})</span></span>
+          <span style="font-size:13px; color:${color}; font-weight:600;">${estado}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  display.innerHTML = parejaHtml + statsHtml + tiempoHtml + criasHtml;
+}
+
+function closeModalAndShowBird(id) {
+  showBirdDetail(id);
+}
+
+// =========== ZONAS ===========
 function renderZones() {
   const list = document.getElementById('zone-list');
   list.innerHTML = state.zones.map(z => {
