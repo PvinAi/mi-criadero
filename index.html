@@ -2753,6 +2753,7 @@ function showBirdDetail(id) {
       <div class="detail-row"><span class="label">Madre</span><span class="value">${b.madre || '—'}</span></div>
       <div class="detail-row"><span class="label">Origen</span><span class="value">${b.origen || '—'}</span></div>
       <button class="btn-big secondary" style="margin-top:12px;" onclick="closeModal('modal-detail'); showPage('tree'); document.getElementById('tree-select').value='${b.id}'; renderTree();">Ver árbol genealógico</button>
+      <button class="btn-big secondary" style="margin-top:8px; background:#1A1F2E; color:#fff; border-color:#1A1F2E;" onclick="generatePedigreePDF('${b.id}')"><i class="ti ti-file-download"></i> Descargar Certificado Pedigree (PDF)</button>
     </div>
     <div class="detail-section">
       <h3>Salud</h3>
@@ -3311,6 +3312,297 @@ function loadXLSX() {
     document.head.appendChild(s);
   });
   return _xlsxLoaderPromise;
+}
+
+// Carga jsPDF bajo demanda (solo cuando se genera certificado pedigree).
+let _jspdfLoaderPromise = null;
+function loadJsPDF() {
+  if (window.jspdf) return Promise.resolve();
+  if (_jspdfLoaderPromise) return _jspdfLoaderPromise;
+  _jspdfLoaderPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => { _jspdfLoaderPromise = null; reject(new Error('No se pudo cargar la librería PDF')); };
+    document.head.appendChild(s);
+  });
+  return _jspdfLoaderPromise;
+}
+
+// =========== CERTIFICADO PEDIGREE (PDF) ============
+// Genera un certificado profesional con los datos del ave y su pedigree de 3 generaciones.
+// No incluye avales falsos de terceros — es un registro generado por Mi Criadero.
+async function generatePedigreePDF(birdId) {
+  const bird = state.birds.find(b => b.id === birdId);
+  if (!bird) { toast('⚠️ Ave no encontrada'); return; }
+  try {
+    showSyncStatus('Generando certificado...');
+    await loadJsPDF();
+  } catch(e) {
+    toast('⚠️ No se pudo cargar la librería PDF');
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  // Colores paleta Pizarra
+  const NIGHT = [26, 31, 46];      // azul noche
+  const MENTA = [43, 167, 125];    // verde menta
+  const MENTA_LIGHT = [95, 208, 168]; // menta claro
+  const GRAY_DARK = [95, 107, 126];
+  const GRAY_LIGHT = [139, 147, 167];
+  const CREAM = [247, 248, 250];
+
+  // ====== ENCABEZADO ======
+  // Barra superior azul noche
+  doc.setFillColor(...NIGHT);
+  doc.rect(0, 0, 210, 35, 'F');
+  // Acento menta inferior
+  doc.setFillColor(...MENTA);
+  doc.rect(0, 35, 210, 1.5, 'F');
+
+  // Logo / texto marca (lado izquierdo)
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.text('MI CRIADERO', 15, 18);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...MENTA_LIGHT);
+  doc.text('Registro Genealógico', 15, 25);
+
+  // Código de registro (lado derecho)
+  const regCode = 'MC-' + (bird.placa || '').toString().padStart(5, '0') + '-' +
+                  (bird.id || '').toString().substring(0, 6).toUpperCase();
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text('CÓDIGO DE REGISTRO', 195, 18, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text(regCode, 195, 24, { align: 'right' });
+
+  // ====== TÍTULO ======
+  doc.setTextColor(...NIGHT);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('CERTIFICADO DE REGISTRO', 105, 50, { align: 'center' });
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRAY_DARK);
+  doc.text('Pedigrí Avícola', 105, 57, { align: 'center' });
+
+  // ====== DATOS DEL EJEMPLAR ======
+  let y = 70;
+  doc.setFillColor(...CREAM);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(...NIGHT);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('DATOS DEL EJEMPLAR', 20, y + 5.5);
+  y += 13;
+
+  // Foto del ave (lado derecho) si existe
+  if (bird.foto) {
+    try {
+      doc.addImage(bird.foto, 'JPEG', 150, y - 3, 45, 45);
+      doc.setDrawColor(...GRAY_LIGHT);
+      doc.setLineWidth(0.3);
+      doc.rect(150, y - 3, 45, 45);
+    } catch(e) { /* foto inválida, continuar sin ella */ }
+  }
+
+  // Datos en dos columnas (ancho reducido si hay foto)
+  const colWidth = bird.foto ? 65 : 85;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+
+  function dataLine(label, value, x, yy) {
+    doc.setTextColor(...GRAY_DARK);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(label.toUpperCase(), x, yy);
+    doc.setTextColor(...NIGHT);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text((value || '—').toString(), x, yy + 5);
+  }
+
+  dataLine('Placa', bird.placa, 20, y);
+  dataLine('Nombre', bird.nombre || '—', 20 + colWidth, y);
+  y += 12;
+  dataLine('Género', bird.genero, 20, y);
+  dataLine('Color', bird.color, 20 + colWidth, y);
+  y += 12;
+  dataLine('Nacimiento', bird.nacimiento ? bird.nacimiento : '—', 20, y);
+  dataLine('Edad', calcEdad(bird.nacimiento) || '—', 20 + colWidth, y);
+  y += 12;
+  if (bird.linea) {
+    dataLine('Línea', bird.linea, 20, y);
+    dataLine('Peso', bird.peso ? bird.peso + ' kg' : '—', 20 + colWidth, y);
+    y += 12;
+  }
+
+  // ====== CRIADERO ======
+  y += 4;
+  doc.setFillColor(...CREAM);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(...NIGHT);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('CRIADERO', 20, y + 5.5);
+  y += 13;
+
+  const criadero = getOwnerCriadero() || (state.userProfile ? state.userProfile.criadero : '') || '—';
+  const criadorNombre = (state.ownerProfile ? state.ownerProfile.name : '') ||
+                        (state.userProfile ? state.userProfile.name : '') || '—';
+
+  dataLine('Criador', criadorNombre, 20, y);
+  dataLine('Criadero', criadero, 110, y);
+  y += 14;
+
+  // ====== PEDIGREE (3 GENERACIONES) ======
+  y += 2;
+  doc.setFillColor(...NIGHT);
+  doc.rect(15, y, 180, 8, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('PEDIGRÍ', 20, y + 5.5);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...MENTA_LIGHT);
+  doc.text('3 GENERACIONES', 195, y + 5.5, { align: 'right' });
+  y += 14;
+
+  // Encontrar padres, abuelos y bisabuelos
+  const padre  = findBirdByRef(bird.padre);
+  const madre  = findBirdByRef(bird.madre);
+  const abueloP = padre ? findBirdByRef(padre.padre) : null;
+  const abuelaP = padre ? findBirdByRef(padre.madre) : null;
+  const abueloM = madre ? findBirdByRef(madre.padre) : null;
+  const abuelaM = madre ? findBirdByRef(madre.madre) : null;
+  const bisP1 = abueloP ? findBirdByRef(abueloP.padre) : null;
+  const bisP2 = abueloP ? findBirdByRef(abueloP.madre) : null;
+  const bisP3 = abuelaP ? findBirdByRef(abuelaP.padre) : null;
+  const bisP4 = abuelaP ? findBirdByRef(abuelaP.madre) : null;
+  const bisM1 = abueloM ? findBirdByRef(abueloM.padre) : null;
+  const bisM2 = abueloM ? findBirdByRef(abueloM.madre) : null;
+  const bisM3 = abuelaM ? findBirdByRef(abuelaM.padre) : null;
+  const bisM4 = abuelaM ? findBirdByRef(abuelaM.madre) : null;
+
+  function formatRef(refTxt, foundBird) {
+    if (foundBird) {
+      const placa = foundBird.placa || '';
+      const nombre = foundBird.nombre || '';
+      if (nombre) return placa + (nombre ? ' · ' + nombre : '');
+      return placa;
+    }
+    return (refTxt || '—').toString();
+  }
+
+  // Tabla de pedigree con estilo de árbol
+  function drawAncestor(label, value, x, yy, w, color) {
+    doc.setDrawColor(...GRAY_LIGHT);
+    doc.setLineWidth(0.2);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(x, yy, w, 7, 'FD');
+    doc.setTextColor(...color);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text(label, x + 2, yy + 2.8);
+    doc.setTextColor(...NIGHT);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const txt = (value || '—').toString();
+    doc.text(txt.length > 28 ? txt.substring(0, 26) + '…' : txt, x + 2, yy + 5.8);
+  }
+
+  // Columnas:  Padres (60mm)  |  Abuelos (60mm)  |  Bisabuelos (60mm)
+  const col1X = 17, col2X = 77, col3X = 137;
+  const colW = 58;
+  const rowH = 7;  // altura de cada fila del pedigree (más compacta)
+  let py = y;
+
+  // PADRE
+  drawAncestor('PADRE', formatRef(bird.padre, padre), col1X, py, colW, MENTA);
+  drawAncestor('Abuelo P.', formatRef(padre && padre.padre, abueloP), col2X, py, colW, GRAY_DARK);
+  drawAncestor('P', formatRef(abueloP && abueloP.padre, bisP1), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 0.5;
+  drawAncestor('M', formatRef(abueloP && abueloP.madre, bisP2), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 0.5;
+  drawAncestor('Abuela P.', formatRef(padre && padre.madre, abuelaP), col2X, py, colW, GRAY_DARK);
+  py += rowH + 0.5;
+  drawAncestor('P', formatRef(abuelaP && abuelaP.padre, bisP3), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 0.5;
+  drawAncestor('M', formatRef(abuelaP && abuelaP.madre, bisP4), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 2;
+
+  // MADRE
+  drawAncestor('MADRE', formatRef(bird.madre, madre), col1X, py, colW, MENTA);
+  drawAncestor('Abuelo M.', formatRef(madre && madre.padre, abueloM), col2X, py, colW, GRAY_DARK);
+  drawAncestor('P', formatRef(abueloM && abueloM.padre, bisM1), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 0.5;
+  drawAncestor('M', formatRef(abueloM && abueloM.madre, bisM2), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 0.5;
+  drawAncestor('Abuela M.', formatRef(madre && madre.madre, abuelaM), col2X, py, colW, GRAY_DARK);
+  py += rowH + 0.5;
+  drawAncestor('P', formatRef(abuelaM && abuelaM.padre, bisM3), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 0.5;
+  drawAncestor('M', formatRef(abuelaM && abuelaM.madre, bisM4), col3X, py, colW, GRAY_LIGHT);
+  py += rowH + 2;
+
+  y = py + 2;
+
+  // ====== ESTADÍSTICAS DE PELEAS (si tiene) ======
+  const fights = bird.fights || [];
+  if (fights.length > 0) {
+    doc.setFillColor(...CREAM);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.setTextColor(...NIGHT);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('HISTORIAL DE PELEAS', 20, y + 4.8);
+    y += 10;
+    const wins = fights.filter(f => f.resultado === 'W').length;
+    const losses = fights.filter(f => f.resultado === 'L').length;
+    const ties = fights.filter(f => f.resultado === 'T').length;
+    const efec = fights.length > 0 ? Math.round((wins / fights.length) * 100) : 0;
+    const avg = avgWinTime(bird);
+    dataLine('Total', fights.length, 20, y);
+    dataLine('Ganadas', wins, 65, y);
+    dataLine('Efectividad', efec + '%', 110, y);
+    dataLine('Promedio Victoria', avg != null ? formatDuration(avg) : '—', 155, y);
+    y += 10;
+  }
+
+  // ====== PIE DE PÁGINA ======
+  const footerY = 282;
+  doc.setDrawColor(...GRAY_LIGHT);
+  doc.setLineWidth(0.2);
+  doc.line(15, footerY, 195, footerY);
+
+  doc.setTextColor(...GRAY_DARK);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const fechaEmision = new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' });
+  doc.text('Emitido el ' + fechaEmision, 15, footerY + 5);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Mi Criadero — Sistema de Gestión Avícola', 195, footerY + 5, { align: 'right' });
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY_LIGHT);
+  const disclaimer = 'Documento generado a partir de los registros del criador en el sistema Mi Criadero. ' +
+                     'Constituye un registro genealógico privado basado en la información provista por el criador. ' +
+                     'No constituye un certificado oficial de asociación o entidad pública.';
+  const lines = doc.splitTextToSize(disclaimer, 180);
+  doc.text(lines, 15, footerY + 11);
+
+  // Guardar
+  const filename = `Pedigree-${bird.placa || 'ave'}${bird.nombre ? '-' + bird.nombre : ''}.pdf`;
+  doc.save(filename.replace(/[^a-zA-Z0-9.\-_]/g, '_'));
+  toast('✅ Certificado descargado');
 }
 
 async function exportExcel() {
