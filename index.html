@@ -318,6 +318,9 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
 .btn-big i { vertical-align: -2px; margin-right: 6px; }
 .market-criadero, .zone-name i { color: #2BA77D; }
 .big-icon i { font-size: 56px; color: #C5CAD4; }
+/* Lazy loading: imagen sin src todavía (placeholder gris suave, sin ícono de roto) */
+img.lazy-img:not([src]), img.lazy-img[src=""] { background: #F0F2F5; min-height: 100%; }
+img.lazy-img { transition: opacity 0.25s; }
 /* Pestañas de genealogía */
 .tree-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .tree-tab { flex: 1; background: #fff; border: 0.5px solid #E3E6EC; border-radius: 10px; padding: 12px 8px; font-size: 13px; font-weight: 500; color: #5F6B7E; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
@@ -2260,7 +2263,7 @@ function renderMarket() {
   list.innerHTML = items.map(m => {
     const esMia = m.ownerId === myOwnerId;
     const fotoHtml = m.foto
-      ? `<img src="${m.foto}" style="width:100%; height:100%; object-fit:cover;">`
+      ? `<img class="lazy-img" data-src="${m.foto}" alt="" style="width:100%; height:100%; object-fit:cover;">`
       : `<i class="ti ti-feather" style="color:#8B93A7;font-size:40px;"></i>`;
     const edad = calcEdad(m.nacimiento) || 'Sin dato';
     const miaBadge = esMia ? '<div style="background:#2BA77D; color:#fff; font-size:11px; padding:2px 8px; border-radius:6px;">TUYA</div>'
@@ -2293,6 +2296,8 @@ function renderMarket() {
       </div>
     </div>`;
   }).join('');
+  // Activar lazy loading en las fotos del mercado
+  setupLazyImages();
 }
 
 function setMarketFilter(f) {
@@ -2316,6 +2321,43 @@ function contactSeller(phone, placa, criadero) {
 
 // =========== UTILIDADES ============
 function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2,5); }
+
+// =========== LAZY LOADING DE IMÁGENES ============
+// Carga las fotos solo cuando están por aparecer en pantalla.
+// Esto acelera el renderizado inicial cuando hay muchas aves con foto.
+// Las fotos se cargan con un margen de 250px para que estén listas antes de verse.
+let _lazyObserver = null;
+function setupLazyImages() {
+  // Si el navegador no soporta IntersectionObserver, cargar todo de una vez (fallback)
+  if (!('IntersectionObserver' in window)) {
+    document.querySelectorAll('img.lazy-img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+      img.removeAttribute('data-src');
+      img.classList.remove('lazy-img');
+    });
+    return;
+  }
+  // Crear el observer una sola vez (reutilizable)
+  if (!_lazyObserver) {
+    _lazyObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          if (img.dataset.src) {
+            img.src = img.dataset.src;
+            img.removeAttribute('data-src');
+            img.classList.remove('lazy-img');
+          }
+          _lazyObserver.unobserve(img);
+        }
+      });
+    }, { rootMargin: '250px 0px', threshold: 0.01 });
+  }
+  // Observar todas las imágenes lazy que aún no han sido cargadas
+  document.querySelectorAll('img.lazy-img[data-src]').forEach(img => {
+    _lazyObserver.observe(img);
+  });
+}
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -2698,7 +2740,7 @@ function renderBirds() {
   }
 
   list.innerHTML = birds.map(b => {
-    const photoHtml = b.foto ? `<img src="${b.foto}">` : `<i class="ti ti-feather" style="color:#8B93A7;"></i>`;
+    const photoHtml = b.foto ? `<img class="lazy-img" data-src="${b.foto}" alt="">` : `<i class="ti ti-feather" style="color:#8B93A7;"></i>`;
     const vitalBadge = b.vital === 'muerto' ? '<span class="badge dead">✝ Muerto</span>' :
                        b.vital === 'vendido' ? '<span class="badge sold">Vendido</span>' :
                        b.vital === 'venta' ? '<span class="badge" style="background:#27AE60;color:#fff;">En venta</span>' : '';
@@ -2711,6 +2753,8 @@ function renderBirds() {
       <div class="bird-chevron">›</div>
     </div>`;
   }).join('');
+  // Activar lazy loading después de renderizar la lista
+  setupLazyImages();
 }
 
 
