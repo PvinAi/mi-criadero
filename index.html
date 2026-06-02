@@ -22,8 +22,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 
-<!-- SheetJS para Excel (.xlsx) -->
-<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<!-- SheetJS (Excel) se carga BAJO DEMANDA cuando se importa/exporta -->
 
 <!-- Tabler Icons (íconos de línea profesionales) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
@@ -558,6 +557,7 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
     <button class="btn-big secondary" id="admin-panel-btn" onclick="showPage('admin')" style="display:none;"><i class="ti ti-shield-check"></i> Panel de Administrador</button>
     <button class="btn-big secondary" id="team-btn" onclick="showPage('team')" style="display:none;"><i class="ti ti-users"></i> Mi Equipo (sub-usuarios)</button>
     <button class="btn-big secondary" id="profile-btn" onclick="openProfileForm()"><i class="ti ti-home"></i> Mi perfil de criadero</button>
+    <button class="btn-big secondary" id="backups-btn" onclick="showPage('backups')"><i class="ti ti-history"></i> Restaurar copia anterior</button>
     <button class="btn-big secondary" onclick="changePassword()"><i class="ti ti-key"></i> Cambiar mi contraseña</button>
     <button class="btn-big secondary" onclick="exportExcel()"><i class="ti ti-file-download"></i> Descargar plantilla Excel</button>
     <button class="btn-big secondary" onclick="exportData()"><i class="ti ti-file-export"></i> Exportar mis datos (Excel)</button>
@@ -607,6 +607,22 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
     </div>
     <button class="btn-big" id="add-subuser-btn" onclick="openNewSubuserForm()">+ Agregar persona a mi equipo</button>
     <div id="team-list"></div>
+  </div>
+</div>
+
+<!-- PÁGINA: RESTAURAR COPIA -->
+<div class="page" id="page-backups">
+  <div class="page-header">
+    <h2><i class="ti ti-history"></i> Restaurar copia</h2>
+    <p>Recupera tus datos a una fecha anterior</p>
+  </div>
+  <div class="page-content">
+    <div class="help-text" style="padding:12px 14px; background:#FEF6E7; border-radius:8px; margin-bottom:14px; color:#1A1F2E; font-size:13px; border-left:3px solid #EF9F27;">
+      <strong>⚠️ Importante:</strong> Restaurar reemplazará TUS DATOS ACTUALES por los de la copia que elijas.
+      Los cambios hechos después de esa fecha se perderán. Antes de restaurar, la app guarda automáticamente
+      una copia "de seguridad" del estado actual, por si te arrepientes.
+    </div>
+    <div id="backups-list"></div>
   </div>
 </div>
 
@@ -959,6 +975,37 @@ h1 i, h2 i { vertical-align: -2px; margin-right: 4px; color: #2BA77D; }
   </div>
 </div>
 
+<!-- MODAL: CONFIRMAR RESTAURACIÓN (doble confirmación con texto) -->
+<div class="modal-overlay" id="modal-restore">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-btn" onclick="closeModal('modal-restore')">Cancelar</button>
+      <div class="modal-title">Confirmar restauración</div>
+      <button class="modal-btn" style="color:#E24B4A; opacity:0.5;" id="restore-confirm-btn" onclick="doRestore()" disabled>Restaurar</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#FDECEA; border-radius:10px; padding:14px; margin-bottom:14px; color:#1A1F2E; font-size:13px; line-height:1.6;">
+        <strong>Estás a punto de restaurar tus datos a:</strong>
+        <div id="restore-date" style="font-size:15px; font-weight:600; margin:6px 0; color:#1A1F2E;"></div>
+        <div id="restore-count" style="font-size:13px; color:#5F6B7E;"></div>
+        <hr style="border:none; border-top:1px solid #F4C8C5; margin:10px 0;">
+        <strong>Esto reemplazará tus datos actuales</strong> (<span id="restore-current-count"></span>).
+        Los cambios hechos después de esa fecha se perderán.
+      </div>
+      <div style="background:#EEF6F2; border-radius:10px; padding:10px 14px; margin-bottom:14px; color:#1A1F2E; font-size:12px; border-left:3px solid #2BA77D;">
+        <i class="ti ti-shield-check" style="color:#2BA77D;"></i> Antes de restaurar, guardaremos automáticamente
+        una copia de tu estado actual. Si te arrepientes, podrás volver atrás desde aquí mismo.
+      </div>
+      <div class="form-section">
+        <div class="form-row">
+          <label class="form-label" style="font-size:14px;">Escribe <strong>RESTAURAR</strong> para confirmar</label>
+          <input type="text" class="form-input" id="restore-typed" placeholder="RESTAURAR" oninput="checkRestoreInput()" autocomplete="off">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: MAPEO DE IMPORTACIÓN -->
 <div class="modal-overlay" id="modal-import">
   <div class="modal">
@@ -1276,6 +1323,9 @@ async function onUserLoggedIn(user) {
 
     if (state.isAdmin) loadAllUsers();
 
+    // Crear respaldo automático en background (no bloquea la UI)
+    setTimeout(() => createAutoBackup(), 2000);
+
   } catch(e) {
     console.error('Error cargando usuario:', e);
     showFullLoader(false);
@@ -1304,6 +1354,9 @@ function applyPermissions() {
   // Botón "Mi perfil de criadero": solo el dueño (no sub-usuarios)
   const profileBtn = document.getElementById('profile-btn');
   if (profileBtn) profileBtn.style.display = (state.userProfile && state.userProfile.parentId) ? 'none' : 'block';
+  // Botón "Restaurar copia": solo el dueño (no sub-usuarios)
+  const backupsBtn = document.getElementById('backups-btn');
+  if (backupsBtn) backupsBtn.style.display = (state.userProfile && state.userProfile.parentId) ? 'none' : 'block';
 
   // Si está en una página sin permiso, volver a aves
   // (los sub-usuarios siempre pueden ver aves por defecto)
@@ -1375,6 +1428,190 @@ async function loadUserData() {
   }
 }
 
+// =========== RESPALDOS AUTOMÁTICOS ============
+// Crea un respaldo automático al entrar (solo el dueño, no sub-usuarios).
+// Mantiene las últimas 3 copias rotando.
+// Solo guarda respaldo si hay datos Y si el último es de hace >= 6 horas
+// (para no llenar de respaldos a usuarios que entran muchas veces al día).
+async function createAutoBackup() {
+  // Sub-usuarios no crean respaldos (los crea el dueño)
+  if (!state.user) return;
+  if (state.userProfile && state.userProfile.parentId) return;
+  // No hay nada que respaldar
+  if (!state.birds || state.birds.length === 0) return;
+  try {
+    const ownerId = state.user.uid;
+    const backupsCol = window.fb.collection(window.fb.db, 'users', ownerId, 'backups');
+    // Cargar respaldos existentes
+    const snap = await window.fb.getDocs(backupsCol);
+    const existing = [];
+    snap.forEach(d => existing.push({ id: d.id, ...d.data() }));
+    existing.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    // Si el último respaldo es de hace menos de 6 horas, no crear otro
+    if (existing.length > 0) {
+      const lastDate = new Date(existing[0].createdAt);
+      const horasDesde = (Date.now() - lastDate.getTime()) / (1000*60*60);
+      if (horasDesde < 6) return;  // muy reciente, no duplicar
+    }
+    // Crear nuevo respaldo
+    const backupId = 'bk_' + Date.now();
+    await window.fb.setDoc(window.fb.doc(window.fb.db, 'users', ownerId, 'backups', backupId), {
+      birds: state.birds,
+      zones: state.zones,
+      inventory: state.inventory,
+      pending: state.pending,
+      birdsCount: state.birds.length,
+      createdAt: new Date().toISOString()
+    });
+    // Mantener solo las 3 más recientes (incluyendo la nueva): borrar las viejas
+    if (existing.length >= 3) {
+      const toDelete = existing.slice(2);  // del índice 2 en adelante son las más viejas
+      for (const old of toDelete) {
+        try { await window.fb.deleteDoc(window.fb.doc(window.fb.db, 'users', ownerId, 'backups', old.id)); } catch(e) {}
+      }
+    }
+  } catch(e) {
+    console.warn('No se pudo crear respaldo automático:', e);
+    // Falla silenciosa: no molestar al usuario
+  }
+}
+
+// Lista los respaldos del usuario actual
+async function loadMyBackups() {
+  if (!state.user) return [];
+  try {
+    const ownerId = state.user.uid;
+    const snap = await window.fb.getDocs(window.fb.collection(window.fb.db, 'users', ownerId, 'backups'));
+    const list = [];
+    snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+    list.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    return list;
+  } catch(e) {
+    console.error('Error cargando respaldos:', e);
+    return [];
+  }
+}
+
+// Restaura los datos a una copia anterior
+async function restoreFromBackup(backupId) {
+  if (!state.user) return;
+  // Antes de restaurar, crear un respaldo "de seguridad" del estado actual
+  // (por si la persona se arrepiente DESPUÉS de restaurar)
+  try {
+    const ownerId = state.user.uid;
+    const safetyId = 'bk_safety_' + Date.now();
+    await window.fb.setDoc(window.fb.doc(window.fb.db, 'users', ownerId, 'backups', safetyId), {
+      birds: state.birds,
+      zones: state.zones,
+      inventory: state.inventory,
+      pending: state.pending,
+      birdsCount: state.birds.length,
+      createdAt: new Date().toISOString(),
+      isSafety: true  // marca especial: "antes de restaurar"
+    });
+    // Cargar el respaldo elegido
+    const refBackup = window.fb.doc(window.fb.db, 'users', ownerId, 'backups', backupId);
+    const snap = await window.fb.getDoc(refBackup);
+    if (!snap.exists()) { toast('⚠️ No se encontró ese respaldo'); return; }
+    const b = snap.data();
+    // Reemplazar el estado actual
+    state.birds = b.birds || [];
+    state.zones = b.zones || state.zones;
+    state.inventory = b.inventory || [];
+    state.pending = b.pending || [];
+    // Guardar el estado restaurado
+    await saveState();
+    return true;
+  } catch(e) {
+    console.error('Error al restaurar:', e);
+    toast('⚠️ No se pudo restaurar');
+    return false;
+  }
+}
+
+// =========== UI DE RESPALDOS ============
+let _selectedBackup = null;
+
+async function showBackupsPage() {
+  // Sub-usuarios no pueden ver respaldos (es del dueño)
+  if (state.userProfile && state.userProfile.parentId) {
+    toast('Solo el dueño del criadero puede restaurar respaldos');
+    showPage('more');
+    return;
+  }
+  const list = document.getElementById('backups-list');
+  list.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-history"></i></div><p>Cargando respaldos...</p></div>';
+  const backups = await loadMyBackups();
+  if (backups.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-history"></i></div><h2>Sin respaldos aún</h2><p>Los respaldos se crean automáticamente al entrar a la app.</p></div>';
+    return;
+  }
+  list.innerHTML = backups.map(b => {
+    const date = new Date(b.createdAt);
+    const dia = date.toLocaleDateString('es', {day:'numeric', month:'long', year:'numeric'});
+    const hora = date.toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'});
+    const isSafety = !!b.isSafety;
+    return `<div class="user-row" onclick="openRestoreConfirm('${b.id}')">
+      <div class="user-avatar" style="background:${isSafety ? '#FEF6E7' : '#EEF6F2'};">
+        <i class="ti ${isSafety ? 'ti-shield' : 'ti-history'}" style="color:${isSafety ? '#C8881E' : '#2BA77D'};"></i>
+      </div>
+      <div class="user-row-info">
+        <div class="user-row-name">${dia}${isSafety ? ' (de seguridad)' : ''}</div>
+        <div class="user-row-email">${hora} · ${b.birdsCount || 0} aves</div>
+      </div>
+      <div class="bird-chevron">›</div>
+    </div>`;
+  }).join('');
+}
+
+function openRestoreConfirm(backupId) {
+  loadMyBackups().then(backups => {
+    const b = backups.find(x => x.id === backupId);
+    if (!b) return;
+    _selectedBackup = b;
+    const date = new Date(b.createdAt);
+    document.getElementById('restore-date').textContent =
+      date.toLocaleDateString('es', {day:'numeric', month:'long', year:'numeric'}) + ' · ' +
+      date.toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit'});
+    document.getElementById('restore-count').textContent = `${b.birdsCount || 0} aves guardadas en esta copia`;
+    document.getElementById('restore-current-count').textContent = `${state.birds.length} aves actuales`;
+    document.getElementById('restore-typed').value = '';
+    checkRestoreInput();
+    openModal('modal-restore');
+  });
+}
+
+function checkRestoreInput() {
+  const val = (document.getElementById('restore-typed').value || '').trim().toUpperCase();
+  const btn = document.getElementById('restore-confirm-btn');
+  if (val === 'RESTAURAR') {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.fontWeight = '600';
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.fontWeight = '400';
+  }
+}
+
+async function doRestore() {
+  if (!_selectedBackup) return;
+  const btn = document.getElementById('restore-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+  const ok = await restoreFromBackup(_selectedBackup.id);
+  btn.disabled = false;
+  btn.textContent = 'Restaurar';
+  if (ok) {
+    closeModal('modal-restore');
+    renderBirds();
+    toast('✅ Datos restaurados correctamente');
+    // Recargar la lista de respaldos (ahora hay uno nuevo "de seguridad")
+    showBackupsPage();
+  }
+}
+
 let _saveTimeout = null;
 function saveState() {
   // Debounce: agrupar varios saves seguidos en una sola escritura a Firestore
@@ -1417,9 +1654,10 @@ async function loadAllUsers() {
   }
 }
 
-function exportUsers() {
+async function exportUsers() {
   if (!state.isAdmin) { toast('⚠️ Solo el administrador'); return; }
   if (state.allUsers.length === 0) { toast('⚠️ No hay usuarios'); return; }
+  try { showSyncStatus('Cargando Excel...'); await loadXLSX(); } catch(e) { toast('⚠️ No se pudo cargar Excel'); return; }
   const headers = ['Nombre','Correo','Teléfono','Criadero','Rol','Estado','Creado','Vence'];
   const rows = state.allUsers.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(u => [
     u.name||'', u.email||'', u.phone||'', u.criadero || (u.parentName ? 'Equipo de '+u.parentName : ''),
@@ -2098,6 +2336,7 @@ function showPage(name) {
   if (name === 'admin') { loadAllUsers(); }
   if (name === 'team') { loadMyTeam(); }
   if (name === 'market') { loadMarket(); }
+  if (name === 'backups') { showBackupsPage(); }
   window.scrollTo(0,0);
 }
 function setFilter(f) {
@@ -2228,19 +2467,26 @@ function resetPhotoUI() {
 function handlePhoto(e) {
   const file = e.target.files[0];
   if (!file) return;
+  // Compresión optimizada: las fotos quedan pequeñas (~50-150 KB)
+  // sin sacrificar nitidez en pantalla de celular.
   const reader = new FileReader();
   reader.onload = (ev) => {
-    // Reducir imagen para no llenar storage
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const maxSize = 600;
+      const maxSize = 500;  // 500 px de lado mayor (suficiente para celular)
       let w = img.width, h = img.height;
       if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
       else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      tempPhoto = canvas.toDataURL('image/jpeg', 0.7);
+      // Primera pasada a 65% calidad
+      let dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+      // Si sigue siendo grande (>200KB), bajar más calidad
+      if (dataUrl.length > 200 * 1024 * 1.37) {
+        dataUrl = canvas.toDataURL('image/jpeg', 0.5);
+      }
+      tempPhoto = dataUrl;
       document.getElementById('photo-preview').innerHTML = `<img src="${tempPhoto}">`;
       document.getElementById('photo-preview').classList.add('has-photo');
       document.getElementById('clear-photo-btn').style.display = 'inline-block';
@@ -3051,7 +3297,24 @@ function birdToRow(b) {
 }
 
 // Descargar plantilla CON aves de ejemplo
-function exportExcel() {
+// Carga SheetJS bajo demanda (solo cuando se importa/exporta).
+// Acelera el arranque inicial al no descargar ~900 KB que no siempre se usan.
+let _xlsxLoaderPromise = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve();
+  if (_xlsxLoaderPromise) return _xlsxLoaderPromise;
+  _xlsxLoaderPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => { _xlsxLoaderPromise = null; reject(new Error('No se pudo cargar la librería de Excel')); };
+    document.head.appendChild(s);
+  });
+  return _xlsxLoaderPromise;
+}
+
+async function exportExcel() {
+  try { showSyncStatus('Cargando Excel...'); await loadXLSX(); } catch(e) { toast('⚠️ No se pudo cargar Excel'); return; }
   const ejemplos = [
     ['152','Regalo','Gallo','Colorado','','2024-05-25','', '','52','125','','En cuido','Voladeros','vivo','',''],
     ['1078','BOMBA','Gallo','Colorado','KELSON','2025-01-08','','2.5','85','95','','Moviéndose','Voladeros','vivo','Vitamina C',''],
@@ -3068,8 +3331,9 @@ function exportExcel() {
 }
 
 // Exportar MIS datos (sin ejemplos)
-function exportData() {
+async function exportData() {
   if (state.birds.length === 0) { toast('⚠️ No tienes aves para exportar'); return; }
+  try { showSyncStatus('Cargando Excel...'); await loadXLSX(); } catch(e) { toast('⚠️ No se pudo cargar Excel'); return; }
   const rows = state.birds
     .slice()
     .sort((a,b)=>(a.placa||'').localeCompare(b.placa||'',undefined,{numeric:true}))
@@ -3108,6 +3372,7 @@ let _importWorkbook = null;
 async function importExcel(e) {
   const file = e.target.files[0];
   if (!file) return;
+  try { showSyncStatus('Cargando Excel...'); await loadXLSX(); } catch(err) { toast('⚠️ No se pudo cargar Excel'); e.target.value=''; return; }
   const reader = new FileReader();
   reader.onload = async (ev) => {
     try {
