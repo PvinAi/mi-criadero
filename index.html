@@ -77,6 +77,10 @@ body { padding-bottom: calc(90px + env(safe-area-inset-bottom)); min-height: 100
 .header h1 { font-size: 28px; font-weight: 700; }
 .btn-add { width: 44px; height: 44px; background: #2BA77D; color: white; border: none; border-radius: 22px; font-size: 28px; font-weight: 300; line-height: 44px; cursor: pointer; box-shadow: 0 2px 8px rgba(43,167,125,0.3); }
 .btn-add:active { background: #1F8A66; }
+/* Botón flotante (FAB) para agregar aves */
+.fab { position: fixed; right: 20px; bottom: calc(90px + env(safe-area-inset-bottom)); width: 58px; height: 58px; background: #2BA77D; color: #fff; border: 3px solid #fff; border-radius: 29px; font-size: 32px; font-weight: 300; line-height: 1; cursor: pointer; box-shadow: 0 4px 16px rgba(43,167,125,0.5); z-index: 90; display: none; align-items: center; justify-content: center; padding: 0; transition: transform 0.15s, background 0.15s; }
+.fab.show { display: flex; }
+.fab:active { background: #1F8A66; transform: scale(0.92); }
 .search-box { width: 100%; padding: 12px 16px; background: #E3E6EC; border: none; border-radius: 10px; font-size: 17px; }
 
 /* Bottom Nav */
@@ -326,6 +330,11 @@ img.lazy-img { transition: opacity 0.25s; }
 .tree-tab { flex: 1; background: #fff; border: 0.5px solid #E3E6EC; border-radius: 10px; padding: 12px 8px; font-size: 13px; font-weight: 500; color: #5F6B7E; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .tree-tab.active { background: #1A1F2E; color: #fff; border-color: #1A1F2E; }
 .tree-tab i { font-size: 16px; }
+/* Pestañas de modo de análisis de línea */
+.line-mode-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.line-mode-tab { flex: 1; background: #fff; border: 0.5px solid #E3E6EC; border-radius: 10px; padding: 10px 4px; font-size: 12px; font-weight: 500; color: #5F6B7E; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+.line-mode-tab.active { background: #2BA77D; color: #fff; border-color: #2BA77D; }
+.line-mode-tab i { font-size: 16px; }
 
 /* ===== Color de marca: header y acentos ===== */
 .header h1 { color: #1A1F2E; }
@@ -417,7 +426,6 @@ img.lazy-img { transition: opacity 0.25s; }
   <div class="header">
     <div class="header-row">
       <h1><i class="ti ti-feather"></i> Mis Aves</h1>
-      <button class="btn-add" onclick="openBirdForm()">+</button>
     </div>
     <input type="text" class="search-box" placeholder="Buscar por placa o nombre..." id="search-input" oninput="renderBirds()">
   </div>
@@ -466,22 +474,35 @@ img.lazy-img { transition: opacity 0.25s; }
 
     <!-- SUB-SECCIÓN: Análisis de línea -->
     <div id="subsection-line" style="display:none;">
+      <!-- Selector de modo de búsqueda -->
+      <div class="line-mode-tabs">
+        <button class="line-mode-tab active" id="lmode-padre" onclick="setLineMode('padre')">
+          <i class="ti ti-feather"></i> Por padre
+        </button>
+        <button class="line-mode-tab" id="lmode-madre" onclick="setLineMode('madre')">
+          <i class="ti ti-feather"></i> Por madre
+        </button>
+        <button class="line-mode-tab" id="lmode-pareja" onclick="setLineMode('pareja')">
+          <i class="ti ti-heart"></i> Pareja exacta
+        </button>
+      </div>
+
       <div class="form-section">
-        <div class="form-row">
+        <div class="form-row" id="line-padre-row">
           <label class="form-label">Padre</label>
           <select class="form-select" id="line-padre" onchange="renderLineAnalysis()">
             <option value="">-- Elige el padre --</option>
           </select>
         </div>
-        <div class="form-row">
+        <div class="form-row" id="line-madre-row">
           <label class="form-label">Madre</label>
           <select class="form-select" id="line-madre" onchange="renderLineAnalysis()">
             <option value="">-- Elige la madre --</option>
           </select>
         </div>
       </div>
-      <div class="help-text" style="padding:0 4px 12px; color:#8B93A7; font-size:13px;">
-        Elige una pareja reproductora para ver la calidad de su descendencia. También puedes elegir solo el padre o solo la madre.
+      <div class="help-text" id="line-mode-help" style="padding:0 4px 12px; color:#2BA77D; font-size:13px;">
+        <i class="ti ti-info-circle"></i> Verás todos los hijos de este padre, con cualquier hembra.
       </div>
       <div id="line-display"></div>
     </div>
@@ -654,6 +675,9 @@ img.lazy-img { transition: opacity 0.25s; }
     <div class="modal-body" id="user-detail-body"></div>
   </div>
 </div>
+
+<!-- Botón flotante (FAB) para agregar aves — solo visible en la página Aves -->
+<button class="fab" id="fab-add-bird" onclick="openBirdForm()" aria-label="Agregar ave">+</button>
 
 <!-- Bottom Navigation -->
 <div class="bottom-nav">
@@ -1252,6 +1276,9 @@ async function doLogout() {
   // Limpiar listeners
   state.unsubscribers.forEach(unsub => { try { unsub(); } catch(e){} });
   state.unsubscribers = [];
+  // Ocultar botón flotante
+  const fab = document.getElementById('fab-add-bird');
+  if (fab) fab.classList.remove('show');
   await window.fb.signOut(window.fb.auth);
 }
 
@@ -1350,6 +1377,9 @@ async function onUserLoggedIn(user) {
 
     updateUserInfoUI();
     renderBirds();
+    // Mostrar el botón flotante (+) si arrancamos en la página Aves con permiso
+    const fab = document.getElementById('fab-add-bird');
+    if (fab) fab.classList.toggle('show', can('addBirds'));
     showFullLoader(false);
 
     if (state.isAdmin) loadAllUsers();
@@ -2770,6 +2800,9 @@ function showPage(name) {
   if (name === 'market') { loadMarket(); trackAction('marketOpened'); }
   if (name === 'backups') { showBackupsPage(); }
   if (name === 'analytics') { loadAnalytics(); }
+  // Mostrar el botón flotante (+) solo en la página Aves y si tiene permiso de agregar
+  const fab = document.getElementById('fab-add-bird');
+  if (fab) fab.classList.toggle('show', name === 'birds' && can('addBirds'));
   window.scrollTo(0,0);
 }
 function setFilter(f) {
@@ -3389,12 +3422,40 @@ function renderTree() {
 }
 
 // =========== ANÁLISIS DE LÍNEA ============
+let _lineMode = 'padre';  // 'padre' | 'madre' | 'pareja'
+
 function switchTreeTab(tab) {
   document.getElementById('tab-tree').classList.toggle('active', tab === 'tree');
   document.getElementById('tab-line').classList.toggle('active', tab === 'line');
   document.getElementById('subsection-tree').style.display = tab === 'tree' ? 'block' : 'none';
   document.getElementById('subsection-line').style.display = tab === 'line' ? 'block' : 'none';
-  if (tab === 'line') populateLineSelects();
+  if (tab === 'line') { populateLineSelects(); setLineMode(_lineMode); }
+}
+
+// Cambia el modo de búsqueda: por padre, por madre o pareja exacta
+function setLineMode(mode) {
+  _lineMode = mode;
+  document.getElementById('lmode-padre').classList.toggle('active', mode === 'padre');
+  document.getElementById('lmode-madre').classList.toggle('active', mode === 'madre');
+  document.getElementById('lmode-pareja').classList.toggle('active', mode === 'pareja');
+  // Mostrar/ocultar selectores según el modo
+  const padreRow = document.getElementById('line-padre-row');
+  const madreRow = document.getElementById('line-madre-row');
+  const help = document.getElementById('line-mode-help');
+  if (mode === 'padre') {
+    padreRow.style.display = 'flex';
+    madreRow.style.display = 'none';
+    help.innerHTML = '<i class="ti ti-info-circle"></i> Verás todos los hijos de este padre, con cualquier hembra.';
+  } else if (mode === 'madre') {
+    padreRow.style.display = 'none';
+    madreRow.style.display = 'flex';
+    help.innerHTML = '<i class="ti ti-info-circle"></i> Verás todos los hijos de esta madre, con cualquier macho.';
+  } else { // pareja
+    padreRow.style.display = 'flex';
+    madreRow.style.display = 'flex';
+    help.innerHTML = '<i class="ti ti-info-circle"></i> Verás solo las crías de esta pareja exacta (padre + madre).';
+  }
+  renderLineAnalysis();
 }
 
 function populateLineSelects() {
@@ -3451,18 +3512,31 @@ function lineStats(offspring) {
 }
 
 function renderLineAnalysis() {
-  const padreBird = state.birds.find(b => b.id === document.getElementById('line-padre').value);
-  const madreBird = state.birds.find(b => b.id === document.getElementById('line-madre').value);
+  // Según el modo, tomar solo padre, solo madre, o ambos
+  const padreSel = state.birds.find(b => b.id === document.getElementById('line-padre').value);
+  const madreSel = state.birds.find(b => b.id === document.getElementById('line-madre').value);
+  let padreBird = null, madreBird = null;
+  if (_lineMode === 'padre') { padreBird = padreSel; }
+  else if (_lineMode === 'madre') { madreBird = madreSel; }
+  else { padreBird = padreSel; madreBird = madreSel; }
   const display = document.getElementById('line-display');
 
   if (!padreBird && !madreBird) {
-    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-chart-dots"></i></div><h2>Elige una pareja</h2><p>Selecciona padre y/o madre para ver el análisis</p></div>';
+    const msg = _lineMode === 'padre' ? 'Selecciona un padre para ver toda su descendencia'
+              : _lineMode === 'madre' ? 'Selecciona una madre para ver toda su descendencia'
+              : 'Selecciona el padre y la madre para ver su descendencia';
+    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-chart-dots"></i></div><h2>Elige una opción</h2><p>'+msg+'</p></div>';
+    return;
+  }
+  // En modo pareja, exigir ambos
+  if (_lineMode === 'pareja' && (!padreBird || !madreBird)) {
+    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-heart"></i></div><h2>Faltan datos</h2><p>Para ver la pareja exacta, elige tanto el padre como la madre.</p></div>';
     return;
   }
 
   const offspring = findOffspring(padreBird, madreBird);
   if (offspring.length === 0) {
-    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-search"></i></div><h2>Sin descendencia</h2><p>No se encontraron crías registradas de esta combinación. Verifica que las crías tengan bien escrito el padre/madre (placa o nombre).</p></div>';
+    display.innerHTML = '<div class="empty-state"><div class="big-icon"><i class="ti ti-search"></i></div><h2>Sin descendencia</h2><p>No se encontraron crías registradas. Verifica que las crías tengan bien escrito el padre/madre (placa o nombre).</p></div>';
     return;
   }
 
@@ -3475,23 +3549,47 @@ function renderLineAnalysis() {
     else { valoracion = 'Línea de fondo (resistencia)'; valColor = '#378ADD'; }
   }
 
-  const parejaHtml = `
+  // Encabezado del reproductor según el modo
+  let cabeceraHtml;
+  if (_lineMode === 'pareja') {
+    cabeceraHtml = `
     <div style="background:#fff; border-radius:12px; padding:14px; border:0.5px solid #E3E6EC; margin-bottom:12px;">
       <div style="font-size:12px; color:#8B93A7; margin-bottom:8px;">PAREJA REPRODUCTORA</div>
       <div style="display:flex; align-items:center; gap:10px;">
         <div style="flex:1; text-align:center;">
           <i class="ti ti-feather" style="color:#2BA77D; font-size:22px;"></i>
-          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">${padreBird ? 'Padre '+padreBird.placa : '— Cualquiera —'}</div>
-          <div style="font-size:11px; color:#8B93A7;">${padreBird ? (padreBird.nombre||'')+' · '+(padreBird.color||'') : ''}</div>
+          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">Padre ${padreBird.placa}</div>
+          <div style="font-size:11px; color:#8B93A7;">${(padreBird.nombre||'')+' · '+(padreBird.color||'')}</div>
         </div>
         <div style="color:#C8881E;"><i class="ti ti-heart" style="font-size:18px;"></i></div>
         <div style="flex:1; text-align:center;">
           <i class="ti ti-feather" style="color:#378ADD; font-size:22px;"></i>
-          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">${madreBird ? 'Madre '+madreBird.placa : '— Cualquiera —'}</div>
-          <div style="font-size:11px; color:#8B93A7;">${madreBird ? (madreBird.nombre||'')+' · '+(madreBird.color||'') : ''}</div>
+          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">Madre ${madreBird.placa}</div>
+          <div style="font-size:11px; color:#8B93A7;">${(madreBird.nombre||'')+' · '+(madreBird.color||'')}</div>
         </div>
       </div>
     </div>`;
+  } else {
+    const rep = padreBird || madreBird;
+    const esPadre = !!padreBird;
+    cabeceraHtml = `
+    <div style="background:#fff; border-radius:12px; padding:14px; border:0.5px solid #E3E6EC; margin-bottom:12px;">
+      <div style="font-size:12px; color:#8B93A7; margin-bottom:8px;">${esPadre ? 'PADRE EN ESTUDIO' : 'MADRE EN ESTUDIO'}</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="flex:1; text-align:center;">
+          <i class="ti ti-feather" style="color:${esPadre ? '#2BA77D' : '#378ADD'}; font-size:22px;"></i>
+          <div style="font-size:14px; font-weight:600; color:#1A1F2E;">${esPadre ? 'Padre' : 'Madre'} ${rep.placa}</div>
+          <div style="font-size:11px; color:#8B93A7;">${(rep.nombre||'')+' · '+(rep.color||'')}</div>
+        </div>
+        <div style="color:#C8881E;"><i class="ti ti-arrow-right" style="font-size:14px;"></i></div>
+        <div style="flex:1; text-align:center;">
+          <i class="ti ti-arrows-shuffle" style="color:#8B93A7; font-size:18px;"></i>
+          <div style="font-size:13px; font-weight:600; color:#5F6B7E;">Cualquier</div>
+          <div style="font-size:11px; color:#8B93A7;">${esPadre ? 'madre' : 'padre'}</div>
+        </div>
+      </div>
+    </div>`;
+  }
 
   const statsHtml = `
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
@@ -3514,6 +3612,8 @@ function renderLineAnalysis() {
       <div style="font-size:12px; color:#fff;"><i class="ti ti-bolt" style="color:#EF9F27;"></i> ${valoracion}</div>
     </div>` : '<div style="background:#F0F2F5; border-radius:12px; padding:14px; text-align:center; margin-bottom:12px; color:#8B93A7; font-size:13px;">Aún no hay tiempos de victoria registrados en esta línea</div>';
 
+  // En modo padre/madre, mostrar el otro progenitor de cada cría (para diferenciar lotes)
+  const mostrarOtroProgenitor = (_lineMode !== 'pareja');
   const criasHtml = `
     <div style="font-size:12px; color:#8B93A7; margin-bottom:6px;">DESCENDENCIA (${offspring.length})</div>
     <div style="background:#fff; border-radius:12px; border:0.5px solid #E3E6EC; overflow:hidden;">
@@ -3526,14 +3626,25 @@ function renderLineAnalysis() {
         else if (avg != null) { estado = 'Gana ' + formatDuration(avg); color = '#2BA77D'; }
         else if (cw > 0) { estado = cw + ' ganada' + (cw>1?'s':''); color = '#2BA77D'; }
         else { estado = cl + ' perdida' + (cl>1?'s':''); color = '#E24B4A'; }
+        // El otro progenitor (la madre si buscamos por padre, o viceversa)
+        let otroTxt = '';
+        if (mostrarOtroProgenitor) {
+          const otroRef = _lineMode === 'padre' ? c.madre : c.padre;
+          const otroBird = findBirdByRef(otroRef);
+          const otroLabel = _lineMode === 'padre' ? 'madre' : 'padre';
+          const otroVal = otroBird ? otroBird.placa : (otroRef || '?');
+          otroTxt = ` <span style="font-size:11px; color:#8B93A7;">(${otroLabel}: ${otroVal})</span>`;
+        } else {
+          otroTxt = ` <span style="font-size:11px; color:#8B93A7;">(${c.genero})</span>`;
+        }
         return `<div style="padding:10px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:0.5px solid #F0F2F5;" onclick="closeModalAndShowBird('${c.id}')">
-          <span style="font-size:14px; color:#1A1F2E;">${c.placa}${c.nombre?' · '+c.nombre:''} <span style="font-size:11px; color:#8B93A7;">(${c.genero})</span></span>
+          <span style="font-size:14px; color:#1A1F2E;">${c.placa}${c.nombre?' · '+c.nombre:''}${otroTxt}</span>
           <span style="font-size:13px; color:${color}; font-weight:600;">${estado}</span>
         </div>`;
       }).join('')}
     </div>`;
 
-  display.innerHTML = parejaHtml + statsHtml + tiempoHtml + criasHtml;
+  display.innerHTML = cabeceraHtml + statsHtml + tiempoHtml + criasHtml;
 }
 
 function closeModalAndShowBird(id) {
